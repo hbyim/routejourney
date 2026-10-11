@@ -5,8 +5,8 @@
  * anon key 는 공개용 키라서 이 파일에 넣어 배포해도 됩니다. service_role 키는 절대 넣지 마세요.
  */
 window.RL_CONFIG = {
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'https://cubhtvjqpbftgjvclved.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1Ymh0dmpxcGJmdGdqdmNsdmVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MDUzNzUsImV4cCI6MjEwNzI4MTM3NX0.FDQ4glRZJ337Hk8NSuM5KLPzuMPCqjQg6wgFBB7718M',
 
   // 로그인 수단
   auth: { email: true, google: false, kakao: false },
