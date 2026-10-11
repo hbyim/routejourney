@@ -286,7 +286,8 @@
   function makeMap(el, opts = {}) {
     if (!el) return null;
     if (!window.L) { el.innerHTML = '<p class="muted pad">지도를 불러오지 못했어요.</p>'; return null; }
-    const m = L.map(el, { zoomControl: true, scrollWheelZoom: !!opts.scroll }).setView(opts.center || TOKYO, opts.zoom || 12);
+    const m = L.map(el, { zoomControl: !opts.zoomPos, scrollWheelZoom: !!opts.scroll }).setView(opts.center || TOKYO, opts.zoom || 12);
+    if (opts.zoomPos) L.control.zoom({ position: opts.zoomPos }).addTo(m);
     L.tileLayer(CFG.tileUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, attribution: CFG.tileAttribution || '&copy; OpenStreetMap'
     }).addTo(m);
@@ -628,16 +629,15 @@
         <div class="new-spot">
           <div class="grid2"><label>이름<input class="input" name="name" placeholder="예: 돈키호테 시부야점" maxlength="80"></label>
           <label>종류<select class="input" name="cat">${Object.entries(CATS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
-          <p class="small muted">장소를 검색하거나 지도를 눌러 위치를 정하세요.</p>
-          ${placeSearchHtml()}
-          <div class="map-box small-map" id="pickMap"></div>
+          <p class="small muted">지도 위 검색창에서 장소를 찾거나, 지도를 눌러 위치를 정하세요.</p>
+          ${pickMapHtml('pickMap')}
           <input type="hidden" name="lat"><input type="hidden" name="lng">
         </div>
         <div class="grid2"><label>Day<input class="input" type="number" name="day" min="1" max="60" value="${maxDay}"></label>
         <label>메모<input class="input" name="note" placeholder="왜 추천하나요?" maxlength="200"></label></div>
         <div class="row end"><button type="button" class="btn ghost" data-close>취소</button><button class="btn">추가</button></div>
       </form>`);
-    const m = makeMap($('#pickMap'), { zoom: 12 });
+    const m = makeMap($('#pickMap'), { zoom: 12, zoomPos: 'bottomright' });
     if (m) { const f = $('#modal form'); attachPlaceSearch($('#modal .place-search'), m, attachPicker(m, f), f); }
     $('#modal select[name=existing]').addEventListener('change', e => {
       $('#modal .new-spot').style.display = e.target.value ? 'none' : '';
@@ -681,10 +681,14 @@
     const r = await fetch(u); if (!r.ok) throw new Error('geocode ' + r.status);
     return (await r.json()).map(x => ({ name: x.name || String(x.display_name).split(',')[0], addr: x.display_name || '', lat: +x.lat, lng: +x.lon, cat: guessCat(x.category, x.type) }));
   }
-  function placeSearchHtml() {
-    return `<div class="place-search">
-      <div class="row nowrap"><input class="input" type="search" data-place-q placeholder="장소·주소 검색 (예: 시부야 스카이)" enterkeyhint="search" autocomplete="off"><button type="button" class="btn sm" data-place-go>검색</button></div>
-      <ul class="place-results" data-place-results hidden></ul>
+  // 지도 위에 겹쳐 놓는 검색창. 지도 요소의 형제라서 검색창 클릭이 지도 클릭(핀 찍기)으로 번지지 않는다.
+  function pickMapHtml(id) {
+    return `<div class="map-wrap">
+      <div class="place-search">
+        <div class="place-bar"><span aria-hidden="true">🔍</span><input class="input" type="search" data-place-q placeholder="장소·주소로 위치 찾기" aria-label="장소 검색" enterkeyhint="search" autocomplete="off"><button type="button" class="btn sm" data-place-go>검색</button></div>
+        <ul class="place-results" data-place-results hidden></ul>
+      </div>
+      <div class="map-box pick-map" id="${id}"></div>
     </div>`;
   }
   // 검색 결과를 누르면 핀을 옮기고, 이름·종류 칸이 비어 있으면 채운다
@@ -715,7 +719,7 @@
       set(r.lat, r.lng); m.setView([r.lat, r.lng], 16);
       if (form.name && !form.name.value.trim()) form.name.value = r.name.slice(0, 80);
       if (form.cat && r.cat) form.cat.value = r.cat;
-      list.hidden = true; qEl.value = r.name;
+      list.hidden = true; qEl.value = r.name; qEl.blur();
       if (label) label.textContent = '검색한 위치를 넣었어요. 핀을 끌어 조정할 수 있어요.';
     });
   }
@@ -748,9 +752,8 @@
         <label>종류<select class="input" name="cat">${Object.entries(CATS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
       </div>
       <datalist id="spotNames">${Object.values(db.spots).map(s => `<option value="${esc(s.name)}">`).join('')}</datalist>
-      <div class="row between"><span class="small muted" id="locLabel">장소를 검색하거나, 지도를 누르거나, 현재 위치를 쓰세요.</span><button type="button" class="btn sm ghost" data-act="geo">현재 위치</button></div>
-      ${placeSearchHtml()}
-      <div class="map-box small-map" id="postMap"></div>
+      <div class="row between"><span class="small muted" id="locLabel">지도 위 검색창으로 장소를 찾거나, 지도를 누르거나, 현재 위치를 쓰세요.</span><button type="button" class="btn sm ghost" data-act="geo">현재 위치</button></div>
+      ${pickMapHtml('postMap')}
       <input type="hidden" name="lat"><input type="hidden" name="lng">
       <label>한 줄 기록<textarea class="input" name="text" rows="3" maxlength="300" placeholder="여기서 뭐가 좋았나요? 다음 사람을 위한 팁도요."></textarea></label>
       <div class="grid3">
@@ -772,7 +775,7 @@
   let postPicker = null;
   function mountNew() {
     const form = $('form[data-form=post]');
-    const m = makeMap($('#postMap'), { zoom: 12 });
+    const m = makeMap($('#postMap'), { zoom: 12, zoomPos: 'bottomright' });
     if (m) { postPicker = attachPicker(m, form); attachPlaceSearch(form.querySelector('.place-search'), m, postPicker, form, $('#locLabel')); }
     const input = form.photo;
     input.addEventListener('change', async () => {
