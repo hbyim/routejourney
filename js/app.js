@@ -1208,7 +1208,7 @@
       busy(true);
       try {
         await cloud.signInEmail(v.email.trim());
-        f.innerHTML = `<p><b>${esc(v.email)}</b>로 로그인 링크를 보냈어요.</p><p class="muted small">메일함(스팸함 포함)을 확인하고 링크를 눌러주세요. 이 창은 닫아도 돼요.</p>`;
+        f.innerHTML = `<p><b>${esc(v.email)}</b>로 로그인 링크를 보냈어요.</p><p class="muted small">메일함(스팸함 포함)을 확인하고 가장 최근에 받은 링크를 눌러주세요. 링크는 1시간 동안 한 번만 쓸 수 있어요.</p>`;
       } catch (err) {
         console.error(err);
         busy(false);
@@ -1333,6 +1333,11 @@
         cloud = window.RLCloud.create(CFG);
         await cloud.init();
         await cloud.loadAll(db);
+        if (cloud.authError && !db.me) {
+          const e = cloud.authError;
+          setTimeout(() => toast(/expired|invalid|otp/i.test(e) ? '로그인 링크가 만료됐거나 이미 사용됐어요. 새 링크를 받아주세요.' : '로그인하지 못했어요. 링크를 다시 받아주세요.'), 300);
+          if (!location.hash || location.hash === '#/') location.hash = '#/login';
+        }
       } catch (err) {
         console.error(err);
         if (cloud) {

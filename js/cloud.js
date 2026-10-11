@@ -9,7 +9,9 @@
   function create(cfg) {
     if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase) return null;
     const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' }
+      // 로그인 링크를 요청한 브라우저가 아닌 곳(메일 앱 안 브라우저, 다른 기기)에서 열어도 로그인되도록 implicit 방식을 쓴다.
+      // pkce는 요청한 브라우저에만 남는 검증값이 필요해서, 다른 곳에서 링크를 열면 조용히 실패한다.
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' }
     });
 
     // 쓰기는 한 줄로 세워 순서를 지킨다 (스팟 → 포스트 → 가이드 → 항목 순으로 외래키가 맞도록)
@@ -38,11 +40,19 @@
     const api = {
       sb,
       user: null,
+      authError: null,
       async init() {
-        const { data } = await sb.auth.getSession();
+        // 만료되거나 이미 쓴 링크로 돌아오면 주소에 error_code가 붙어 온다
+        const h = new URLSearchParams(location.hash.slice(1)), qs = new URLSearchParams(location.search);
+        const code = h.get('error_code') || qs.get('error_code') || h.get('error') || qs.get('error');
+        const { data, error } = await sb.auth.getSession();
         api.user = data.session ? data.session.user : null;
-        // 로그인 링크로 돌아왔으면 주소창의 인증 코드를 지운다
-        if (/[?&]code=/.test(location.search)) history.replaceState(null, '', location.pathname + location.hash);
+        if (code || (error && !api.user)) api.authError = code || error.code || error.message || 'unknown';
+        // 주소창에 남은 인증 값(토큰, 코드, 오류)을 지운다
+        const authHash = /(^|[#&])(access_token|refresh_token|error|error_code|error_description)=/.test(location.hash);
+        if (qs.has('code') || qs.has('error') || qs.has('error_code') || authHash) {
+          history.replaceState(null, '', location.pathname + (authHash ? '' : location.hash));
+        }
         return api.user;
       },
       onAuth(cb) { sb.auth.onAuthStateChange((evt, session) => { api.user = session ? session.user : null; cb(evt, api.user); }); },
