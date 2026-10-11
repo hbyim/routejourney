@@ -1,0 +1,153 @@
+/*
+ * Liquid glass 테마. style.css 위에 덮어쓴다.
+ * 색이 번진 배경 위에 반투명 면(흐림 + 채도 + 위쪽 하이라이트)을 띄워 유리처럼 보이게 한다.
+ * 투명도 줄이기 설정이나 backdrop-filter 미지원 브라우저에서는 불투명한 면으로 돌아간다.
+ */
+:root {
+  --bg: #eef3f1;
+  --surface: rgba(255, 255, 255, .58);
+  --surface-2: rgba(255, 255, 255, .38);
+  --solid: #ffffff;
+  --line: rgba(255, 255, 255, .7);
+  --hairline: rgba(15, 23, 42, .08);
+  --glass-blur: blur(22px) saturate(180%);
+  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .85), inset 0 -1px 0 rgba(255, 255, 255, .25);
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, .42), rgba(255, 255, 255, .06) 60%);
+  --shadow: 0 1px 1px rgba(15, 23, 42, .04), 0 8px 28px rgba(15, 23, 42, .08);
+  --radius: 22px;
+  --blob-1: rgba(45, 212, 191, .45);
+  --blob-2: rgba(56, 189, 248, .38);
+  --blob-3: rgba(251, 191, 36, .30);
+  --blob-4: rgba(244, 114, 182, .26);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1114;
+    --surface: rgba(30, 34, 38, .55);
+    --surface-2: rgba(255, 255, 255, .07);
+    --solid: #1b1f22;
+    --line: rgba(255, 255, 255, .14);
+    --hairline: rgba(255, 255, 255, .08);
+    --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 -1px 0 rgba(255, 255, 255, .04);
+    --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, 0) 60%);
+    --shadow: 0 1px 1px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .35);
+    --blob-1: rgba(20, 184, 166, .32);
+    --blob-2: rgba(14, 116, 144, .34);
+    --blob-3: rgba(180, 83, 9, .20);
+    --blob-4: rgba(190, 24, 93, .18);
+  }
+}
+
+/* 유리 뒤에 비칠 배경: 색 번짐을 화면에 고정 */
+body { background: var(--bg); }
+body::before {
+  content: ""; position: fixed; inset: -10vmax; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(38vmax 38vmax at 12% 8%, var(--blob-1), transparent 70%),
+    radial-gradient(42vmax 42vmax at 92% 18%, var(--blob-2), transparent 70%),
+    radial-gradient(36vmax 36vmax at 78% 92%, var(--blob-3), transparent 70%),
+    radial-gradient(34vmax 34vmax at 6% 86%, var(--blob-4), transparent 70%);
+}
+
+/* 공통 유리 면 */
+.card, .modal-card, .tabbar, .sidenav, .toast, .seg, .place-bar, .place-results,
+.btn.ghost, .btn.icon-btn, .chip-btn, .input, .leaflet-bar, .leaflet-control-attribution, .leaflet-popup-content-wrapper {
+  background-color: var(--surface);
+  background-image: var(--glass-sheen);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--line);
+  box-shadow: var(--glass-hi), var(--shadow);
+}
+.card { border-radius: var(--radius); }
+
+/* 하단 탭바: 화면에 떠 있는 알약 모양 */
+.tabbar {
+  inset: auto 12px calc(10px + env(safe-area-inset-bottom)) 12px;
+  height: var(--tab-h); padding-bottom: 0; border-radius: 30px;
+  --surface: rgba(255, 255, 255, .62);
+}
+@media (prefers-color-scheme: dark) { .tabbar { --surface: rgba(28, 32, 36, .62); } }
+.tabbar a { border-radius: 24px; margin: 6px 2px; transition: background .2s, color .2s; }
+.tabbar a.on { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.main { padding-bottom: calc(var(--tab-h) + 40px + env(safe-area-inset-bottom)); }
+.toast { bottom: calc(var(--tab-h) + 26px + env(safe-area-inset-bottom)); color: var(--text); border-radius: 999px; font-weight: 600; }
+
+/* PC 사이드바: 떠 있는 유리 패널 */
+@media (min-width: 768px) {
+  .sidenav { margin: 12px 0 12px 12px; top: 12px; height: calc(100vh - 24px); border-radius: 26px; border-right: 1px solid var(--line); }
+  .navlinks a { border-radius: 14px; transition: background .2s; }
+  .navlinks a:hover { background: var(--surface-2); }
+  .navlinks a.on { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: var(--glass-hi); }
+  .navlinks a.cta { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .main { padding-bottom: 48px; }
+  .toast { bottom: 32px; }
+}
+
+/* 버튼: 알약 모양, 주 버튼은 윤기 있는 색 유리 */
+.btn { border-radius: 999px; transition: transform .12s, filter .2s, box-shadow .2s; }
+.btn.sm { border-radius: 999px; }
+.btn:not(.ghost):not(.icon-btn):not(.danger):not(.light):not(.ghost-light):not(.kakao):not(.more) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 55%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 6px 16px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.btn:active { transform: scale(.97); }
+.btn.ghost:hover, .btn.icon-btn:hover { background-color: var(--surface-2); }
+.btn.danger { background-color: color-mix(in srgb, var(--danger) 8%, transparent); }
+.btn.icon-btn.on { background-color: rgba(254, 226, 226, .75); }
+@media (prefers-color-scheme: dark) { .btn.icon-btn.on { background-color: rgba(69, 10, 10, .6); } }
+
+/* 입력 칸 */
+.input { border-radius: 14px; box-shadow: var(--glass-hi); }
+.input:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 60%, transparent); box-shadow: var(--glass-hi), 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
+select.input { background-color: var(--surface); }
+.place-bar .input { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; border: 0; box-shadow: none; }
+.place-bar { border-radius: 999px; }
+.place-results { border-radius: 18px; }
+
+/* 세그먼트 탭 */
+.seg { border-radius: 999px; }
+.seg a { border-radius: 999px; }
+.seg a.on { background: var(--solid); box-shadow: var(--glass-hi), 0 2px 8px rgba(15, 23, 42, .1); }
+
+/* 모달: 뒤 화면을 흐리게 */
+.modal-back { background: rgba(15, 23, 42, .25); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.modal-card { --surface: rgba(255, 255, 255, .72); border-radius: 28px 28px 0 0; }
+@media (prefers-color-scheme: dark) { .modal-card { --surface: rgba(28, 32, 36, .78); } }
+@media (min-width: 600px) { .modal-card { border-radius: 28px; } }
+
+/* 홈 소개, 여행 중 배너 */
+.intro { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent), var(--glass-sheen); }
+.trip-banner { border-radius: var(--radius); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 10px 26px rgba(15, 118, 110, .3); }
+
+/* 칩, 사진 */
+.chip { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.photo-preview { border-radius: 18px; border-color: var(--line); background: var(--surface-2); }
+.photo.thumb { border-radius: 14px; }
+
+/* 지도 컨트롤 */
+.leaflet-bar { border-radius: 14px !important; overflow: hidden; }
+.leaflet-bar a { background: transparent !important; border-bottom-color: var(--hairline) !important; color: var(--text) !important; }
+.leaflet-control-attribution { border-radius: 10px 0 0 0; box-shadow: none; }
+.map-box { border-radius: 18px; }
+
+/* 접근성·호환: 투명도 줄이기, backdrop-filter 미지원 */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --surface: #ffffff; --surface-2: #f1f5f4; --line: #e2e8e6; }
+  body::before { display: none; }
+}
+@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
+  :root { --surface: #1b1f22; --surface-2: #24292c; --line: #30363a; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --surface: rgba(255, 255, 255, .92); --surface-2: rgba(255, 255, 255, .7); }
+  @media (prefers-color-scheme: dark) { :root { --surface: rgba(27, 31, 34, .95); --surface-2: rgba(255, 255, 255, .08); } }
+}
+
+/* 카드 안의 입력 칸·사진·지도는 흰 유리 위에서도 경계가 보이도록 옅은 선을 쓴다 */
+:root { --field-line: rgba(15, 23, 42, .13); --field-bg: rgba(255, 255, 255, .7); }
+@media (prefers-color-scheme: dark) { :root { --field-line: rgba(255, 255, 255, .14); --field-bg: rgba(255, 255, 255, .05); } }
+.input, select.input { border-color: var(--field-line); background-color: var(--field-bg); }
+.photo-preview { border-color: var(--field-line); }
+.map-box { border: 1px solid var(--field-line); }
+.btn.ghost, .chip-btn { border-color: var(--field-line); }

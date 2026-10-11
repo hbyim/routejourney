@@ -1,7 +1,7 @@
 /* 오프라인에서도 앱 화면이 열리도록 정적 파일만 캐시한다. 서버 API와 지도 타일은 캐시하지 않는다. */
-const VERSION = 'routelog-v3';
+const VERSION = 'routelog-v4';
 const SHELL = [
-  './', 'index.html', 'css/style.css', 'js/config.js', 'js/legal.js', 'js/seed.js', 'js/cloud.js', 'js/app.js',
+  './', 'index.html', 'css/style.css', 'css/glass.css', 'js/config.js', 'js/legal.js', 'js/seed.js', 'js/cloud.js', 'js/app.js',
   'vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css', 'assets/icon.svg', 'manifest.webmanifest'
 ];
 self.addEventListener('install', e => {
