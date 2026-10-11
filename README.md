@@ -2,7 +2,7 @@
 
 여행 중 스팟마다 올린 포스팅이 시간순 **여행가이드**가 되고, 공유받은 사람이 그 가이드를 **따라가거나 포크(리믹스)** 해서 루트·쇼핑·가게를 더해 다시 공유하는 여행 SNS 프로토타입입니다.
 
-배포: https://hbyim.github.io/routejourney/
+배포: https://hbyim.github.io/routejourney/ (main에 푸시하면 Actions가 gh-pages로 옮겨 자동 배포)
 
 ## 주요 기능
 

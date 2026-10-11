@@ -1,0 +1,15 @@
+# GitHub Pages는 gh-pages 브랜치에서 배포됩니다. main에 올린 변경을 gh-pages로 옮깁니다.
+name: Sync main to gh-pages
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git push --force origin HEAD:gh-pages
