@@ -1,0 +1,22 @@
+# js/config.js 의 Supabase 주소·anon 키로 서버 상태(테이블, 인증 설정, 사진 버킷)를 점검합니다. Actions 탭에서 수동 실행.
+name: Check Supabase
+on: workflow_dispatch
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          U=$(grep -oP "supabaseUrl:\s*'\K[^']+" js/config.js | sed 's#/$##')
+          K=$(grep -oP "supabaseAnonKey:\s*'\K[^']+" js/config.js)
+          [ -n "$U" ] || U='${{ github.event.inputs.url }}'
+          echo "== tables"
+          for t in profiles spots posts guides guide_items likes saves follows guide_progress blocks reports; do
+            echo "$t $(curl -s -o /tmp/b -w '%{http_code}' "$U/rest/v1/$t?select=*&limit=1" -H "apikey: $K" -H "Authorization: Bearer $K") $(head -c 200 /tmp/b)"
+          done
+          echo "== rpc delete_my_account (anon, expect error not 404)"
+          curl -s -w ' %{http_code}\n' -X POST "$U/rest/v1/rpc/delete_my_account" -H "apikey: $K" -H "Authorization: Bearer $K" -H 'Content-Type: application/json' -d '{}' | head -c 300; echo
+          echo "== auth settings"
+          curl -s "$U/auth/v1/settings" -H "apikey: $K"; echo
+          echo "== storage public object path (bucket exists => 400/404 object, not bucket)"
+          curl -s -w ' %{http_code}\n' "$U/storage/v1/object/public/photos/none.jpg" | head -c 300; echo
