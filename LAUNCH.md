@@ -5,7 +5,9 @@
 ## 꼭 필요한 것
 
 - [ ] Supabase 프로젝트 생성, `supabase/schema.sql` 실행, URL·anon key를 `js/config.js`에 입력 (README의 "서비스 모드 켜기")
-- [ ] 로그인 메일 발송용 SMTP 연결 (Resend, AWS SES 등)
+- [ ] Supabase Email 설정: Confirm email 끄기, 최소 비밀번호 길이 10, Letters and digits
+- [ ] 비밀번호 재설정 메일 발송용 SMTP 연결 (Resend, AWS SES 등)
+- [ ] (권장) 가입 봇 차단용 CAPTCHA (Supabase Auth의 Cloudflare Turnstile 연동)
 - [ ] 상용 지도 타일 키 발급 후 `config.js`의 `tileUrl` 교체 (MapTiler, Stadia Maps 등). OpenStreetMap 기본 타일은 상용 트래픽에 쓸 수 없습니다.
 - [ ] 사업자등록, `config.js`의 `operator` 정보(상호, 대표자, 사업자번호, 주소, 문의 메일, 개인정보 보호책임자) 입력
 - [ ] 위치기반서비스사업 신고 (방송통신위원회, "현재 위치" 기능 때문에 필요). 신고 전이라면 `현재 위치` 버튼을 숨기는 방법도 있습니다.

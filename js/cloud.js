@@ -41,9 +41,11 @@
       sb,
       user: null,
       authError: null,
+      recovery: false,
       async init() {
         // 만료되거나 이미 쓴 링크로 돌아오면 주소에 error_code가 붙어 온다
         const h = new URLSearchParams(location.hash.slice(1)), qs = new URLSearchParams(location.search);
+        api.recovery = h.get('type') === 'recovery';
         const code = h.get('error_code') || qs.get('error_code') || h.get('error') || qs.get('error');
         const { data, error } = await sb.auth.getSession();
         api.user = data.session ? data.session.user : null;
@@ -205,13 +207,12 @@
       }),
 
       /* ---------- 계정 ---------- */
-      async signInEmail(email) {
-        const redirectTo = location.origin + location.pathname;
-        return ok(await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } }));
+      // 메일 인증 없이 바로 가입한다 (Supabase의 Confirm email 설정을 끈 경우). 켜져 있으면 session 없이 돌아온다.
+      async signUp(email, password) {
+        return ok(await sb.auth.signUp({ email, password, options: { data: { has_password: true }, emailRedirectTo: location.origin + location.pathname } }));
       },
-      // 메일 속 인증 코드로 로그인: 링크를 다른 브라우저·기기에서 봐도, 요청한 이 브라우저가 로그인된다
-      async verifyEmailCode(email, token) {
-        return ok(await sb.auth.verifyOtp({ email, token, type: 'email' }));
+      async resetPassword(email) {
+        return ok(await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }));
       },
       async signInPassword(email, password) {
         return ok(await sb.auth.signInWithPassword({ email, password }));

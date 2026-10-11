@@ -16,7 +16,8 @@
 1. [Supabase](https://supabase.com)에서 프로젝트를 만듭니다 (리전: 서울 `ap-northeast-2` 권장).
 2. SQL Editor 에 `supabase/schema.sql` 전체를 붙여넣고 실행합니다. 테이블, 행 단위 보안(RLS), 사진 버킷, 트리거가 만들어집니다.
 3. Authentication > URL Configuration 에서 Site URL 과 Redirect URLs 에 배포 주소(예: `https://hbyim.github.io/routejourney/`)를 넣습니다.
-4. Authentication > Emails 에서 SMTP(예: Resend, AWS SES)를 연결합니다. 기본 메일 발송은 시간당 몇 통으로 제한돼 실서비스에 쓸 수 없습니다.
+4. Authentication > Sign In / Providers > Email 에서 **Confirm email 을 끄고**(메일 인증 없이 바로 가입), Minimum password length 를 10, Password requirements 를 "Letters and digits" 로 둡니다. 앱도 같은 규칙(10자 이상, 영문·숫자·특수문자, 반복·연속 문자와 흔한 단어 금지)을 가입 화면에서 검사합니다.
+   비밀번호 재설정 메일을 다른 사람에게 보내려면 Authentication > Emails 에서 SMTP(예: Resend)를 연결하고, 원하면 `supabase/email-templates/reset-password.html` 로 한국어 메일을 씁니다.
 5. Project Settings > API 의 Project URL 과 anon public key 를 `js/config.js` 에 넣고 main에 푸시합니다.
 6. (선택) Google·Kakao 로그인: Authentication > Providers 에서 켜고 `config.js` 의 `auth` 를 `true` 로 바꿉니다.
 

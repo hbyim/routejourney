@@ -1,9 +1,0 @@
-<!-- Supabase → Authentication → Emails → Magic Link 에 붙여넣기. 제목: [루트로그] 로그인 인증 코드 {{ .Token }} -->
-<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f2937">
-  <h2 style="margin:0 0 12px">루트로그 로그인</h2>
-  <p style="margin:0 0 16px">로그인 화면에 아래 인증 코드를 입력하세요. 메일을 다른 기기에서 보고 있어도 됩니다.</p>
-  <p style="font-size:32px;font-weight:700;letter-spacing:6px;margin:0 0 20px;color:#0f766e">{{ .Token }}</p>
-  <p style="margin:0 0 8px">로그인을 요청한 브라우저에서 이 메일을 열었다면 아래 버튼을 눌러도 됩니다.</p>
-  <p style="margin:0 0 20px"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#0f766e;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600">이 브라우저에서 로그인</a></p>
-  <p style="font-size:13px;color:#6b7280;margin:0">코드와 링크는 1시간 동안 한 번만 쓸 수 있어요. 요청하지 않았다면 이 메일을 무시하세요.</p>
-</div>

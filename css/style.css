@@ -339,5 +339,10 @@ textarea.input { resize: vertical; }
 @media (min-width: 768px) and (max-width: 1023px) { .sidenav .sitefoot { display: none; } .mobile-foot { display: block; } }
 .photo.cover.ph { align-items: flex-start; }
 
-.input.code { font-size: 1.4rem; letter-spacing: .3em; text-align: center; font-variant-numeric: tabular-nums; }
-.input.code::placeholder { letter-spacing: normal; font-size: 1rem; }
+.seg { display: flex; background: var(--surface-2); border-radius: 12px; padding: 4px; gap: 4px; }
+.seg a { flex: 1; text-align: center; padding: 8px; border-radius: 9px; color: var(--muted); text-decoration: none; font-weight: 600; }
+.seg a.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.pw-rules { list-style: none; margin: -4px 0 0; padding: 0; font-size: .82rem; color: var(--muted); display: grid; gap: 2px; }
+.pw-rules li.ok { color: var(--accent); }
+.linkish { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; cursor: pointer; text-decoration: underline; }
+.row.between { justify-content: space-between; }
