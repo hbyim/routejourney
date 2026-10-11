@@ -209,6 +209,10 @@
         const redirectTo = location.origin + location.pathname;
         return ok(await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } }));
       },
+      // 메일 속 인증 코드로 로그인: 링크를 다른 브라우저·기기에서 봐도, 요청한 이 브라우저가 로그인된다
+      async verifyEmailCode(email, token) {
+        return ok(await sb.auth.verifyOtp({ email, token, type: 'email' }));
+      },
       async signInPassword(email, password) {
         return ok(await sb.auth.signInWithPassword({ email, password }));
       },

@@ -824,6 +824,16 @@
       <p class="small muted">계속하면 <a href="#/legal/terms">이용약관</a>과 <a href="#/legal/privacy">개인정보처리방침</a>을 확인한 것으로 봐요. 가입 직후 동의 화면이 한 번 더 나와요.</p>
     </div>`;
   }
+  function codeForm(email) {
+    return `<form class="form flat" data-form="otp">
+      <p><b>${esc(email)}</b>로 로그인 메일을 보냈어요.</p>
+      <input type="hidden" name="email" value="${esc(email)}">
+      <label>메일에 있는 인증 코드<input class="input code" name="token" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" maxlength="12" placeholder="숫자 코드"></label>
+      <button class="btn big block">코드로 로그인</button>
+      <p class="small muted">메일을 다른 기기나 메일 앱에서 보고 있다면, 링크 대신 코드를 여기에 입력하세요. 이 브라우저에서 바로 로그인돼요. 같은 브라우저에서 메일을 열었다면 링크를 눌러도 돼요. 메일이 안 보이면 스팸함을 확인해주세요.</p>
+      <div class="row center"><a class="btn sm ghost" href="#/login" data-act="reload">다시 받기</a></div>
+    </form>`;
+  }
   function viewWelcome() {
     const u = me();
     if (!u) return viewLogin();
@@ -1246,11 +1256,24 @@
       busy(true);
       try {
         await cloud.signInEmail(v.email.trim());
-        f.innerHTML = `<p><b>${esc(v.email)}</b>로 로그인 링크를 보냈어요.</p><p class="muted small">메일함(스팸함 포함)을 확인하고 가장 최근에 받은 링크를 눌러주세요. 링크는 1시간 동안 한 번만 쓸 수 있어요.</p>`;
+        f.outerHTML = codeForm(v.email.trim());
+        const input = document.querySelector('form[data-form=otp] input[name=token]');
+        if (input) input.focus();
       } catch (err) {
         console.error(err);
         busy(false);
         toast(/rate|limit/i.test(err.message || '') ? '잠시 후 다시 시도해주세요. 메일 요청이 너무 잦아요.' : '메일을 보내지 못했어요. 주소를 확인해주세요.');
+      }
+    } else if (kind === 'otp') {
+      const token = (v.token || '').replace(/\D/g, '');
+      if (token.length < 6) { toast('메일에 있는 숫자 코드를 입력해주세요.'); return; }
+      busy(true);
+      try {
+        await cloud.verifyEmailCode(v.email, token);
+      } catch (err) {
+        console.error(err);
+        busy(false);
+        toast(/expired|invalid|otp/i.test((err.code || '') + (err.message || '')) ? '코드가 맞지 않거나 만료됐어요. 가장 최근 메일의 코드를 입력하거나 다시 받아주세요.' : '로그인하지 못했어요. 잠시 후 다시 시도해주세요.');
       }
     } else if (kind === 'consent') {
       if (!v.age || !v.terms || !v.privacy) { toast('필수 항목에 동의해주세요.'); return; }

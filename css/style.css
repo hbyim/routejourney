@@ -338,3 +338,6 @@ textarea.input { resize: vertical; }
 .account h2 { margin-bottom: 4px; }
 @media (min-width: 768px) and (max-width: 1023px) { .sidenav .sitefoot { display: none; } .mobile-foot { display: block; } }
 .photo.cover.ph { align-items: flex-start; }
+
+.input.code { font-size: 1.4rem; letter-spacing: .3em; text-align: center; font-variant-numeric: tabular-nums; }
+.input.code::placeholder { letter-spacing: normal; font-size: 1rem; }
