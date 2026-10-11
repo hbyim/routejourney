@@ -6,7 +6,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
+      - shell: bash
+        run: |
+          exec > >(tee /tmp/out) 2>&1
           U=$(grep -oP "supabaseUrl:\s*'\K[^']+" js/config.js | sed 's#/$##')
           K=$(grep -oP "supabaseAnonKey:\s*'\K[^']+" js/config.js)
           [ -n "$U" ] || U='${{ github.event.inputs.url }}'
@@ -20,3 +22,4 @@ jobs:
           curl -s "$U/auth/v1/settings" -H "apikey: $K"; echo
           echo "== storage public object path (bucket exists => 400/404 object, not bucket)"
           curl -s -w ' %{http_code}\n' "$U/storage/v1/object/public/photos/none.jpg" | head -c 300; echo
+          sleep 1; while IFS= read -r l; do echo "::notice::$l"; done < /tmp/out
