@@ -68,6 +68,13 @@
     if (m < 43200) return Math.round(m / 1440) + '일 전';
     return fmtTime(iso);
   }
+  function passwordError(err) {
+    const m = (err && (err.code || err.message)) || '';
+    if (/weak|short|characters/i.test(m)) return '비밀번호가 너무 쉬워요. 더 길게 정해주세요.';
+    if (/same/i.test(m)) return '지금 비밀번호와 같아요.';
+    if (/reauth/i.test(m)) return '보안을 위해 로그인 링크로 다시 로그인한 뒤 정해주세요.';
+    return '비밀번호를 저장하지 못했어요.';
+  }
   function toast(msg) {
     const t = $('#toast');
     t.textContent = msg;
@@ -765,6 +772,8 @@
       <p class="small muted">${esc(cloud.user && cloud.user.email || '')}</p>
       <label class="switch"><input type="checkbox" data-act="toggle-location" ${u.locationAgreedAt ? 'checked' : ''}> 위치기반서비스 이용 동의 (현재 위치 버튼)</label>
       <label class="switch"><input type="checkbox" data-act="toggle-marketing" ${u.marketing ? 'checked' : ''}> 이벤트·소식 알림 받기</label>
+      <div class="row"><button class="btn ghost" data-act="set-password">${cloud.hasPassword() ? '비밀번호 변경' : '비밀번호 설정'}</button></div>
+      <p class="small muted">${cloud.hasPassword() ? '이메일과 비밀번호로 메일 없이 로그인할 수 있어요.' : '비밀번호를 정하면 다음부터 메일 인증 없이 로그인할 수 있어요.'}</p>
       <div class="row"><button class="btn ghost" data-act="logout">로그아웃</button><button class="btn danger" data-act="delete-account">회원 탈퇴</button></div>
     </section>`;
   }
@@ -806,8 +815,11 @@
       ${a.email !== false ? `${a.kakao || a.google ? '<p class="or"><span>또는</span></p>' : ''}
       <form class="form flat" data-form="login">
         <label>이메일<input class="input" type="email" name="email" required autocomplete="email" placeholder="you@example.com"></label>
-        <button class="btn big block">로그인 링크 받기</button>
-        <p class="small muted">비밀번호 없이, 메일로 받은 링크를 누르면 바로 로그인돼요. 처음이면 자동으로 가입돼요.</p>
+        <label>비밀번호<input class="input" type="password" name="password" autocomplete="current-password" placeholder="비밀번호를 정했다면 입력"></label>
+        <button class="btn big block" name="mode" value="password">로그인</button>
+        <p class="or"><span>처음이거나 비밀번호가 없다면</span></p>
+        <button class="btn big block ghost" name="mode" value="link">로그인 링크 받기</button>
+        <p class="small muted">메일로 받은 링크를 누르면 바로 로그인되고, 처음이면 자동으로 가입돼요. 가입할 때나 프로필의 계정 메뉴에서 비밀번호를 정하면 다음부터 메일 없이 로그인할 수 있어요.</p>
       </form>` : ''}
       <p class="small muted">계속하면 <a href="#/legal/terms">이용약관</a>과 <a href="#/legal/privacy">개인정보처리방침</a>을 확인한 것으로 봐요. 가입 직후 동의 화면이 한 번 더 나와요.</p>
     </div>`;
@@ -820,6 +832,7 @@
       <p class="muted">시작하기 전에 이름과 약관 동의를 확인해주세요.</p>
       <form class="form flat" data-form="consent">
         <label>이름 (다른 사람에게 보여요)<input class="input" name="name" value="${esc(u.name)}" required maxlength="20"></label>
+        ${cloud.hasPassword() ? '' : '<label>비밀번호 (선택, 8자 이상)<input class="input" type="password" name="password" minlength="8" maxlength="72" autocomplete="new-password" placeholder="정해두면 다음부터 메일 없이 로그인"></label>'}
         <label class="check-line"><input type="checkbox" data-act="agree-all"> <b>모두 동의</b></label>
         <hr>
         <label class="check-line"><input type="checkbox" name="age" required> [필수] 만 14세 이상이에요</label>
@@ -1142,6 +1155,14 @@
       case 'oauth':
         try { await cloud.signInOAuth(el.dataset.provider); } catch (err) { console.error(err); toast('로그인을 시작하지 못했어요. 잠시 후 다시 시도해주세요.'); }
         break;
+      case 'set-password':
+        openModal(`<h2>${cloud.hasPassword() ? '비밀번호 변경' : '비밀번호 설정'}</h2><form class="form flat" data-form="password">
+          <input type="email" name="email" value="${esc(cloud.user && cloud.user.email || '')}" autocomplete="username" hidden>
+          <label>새 비밀번호 (8자 이상)<input class="input" type="password" name="password" required minlength="8" maxlength="72" autocomplete="new-password"></label>
+          <label>한 번 더<input class="input" type="password" name="password2" required minlength="8" maxlength="72" autocomplete="new-password"></label>
+          <div class="row end"><button type="button" class="btn ghost" data-close>취소</button><button class="btn">저장</button></div>
+        </form>`);
+        break;
       case 'logout':
         await cloud.signOut();
         break;
@@ -1197,13 +1218,30 @@
     if (!kind) return;
     e.preventDefault();
     const v = Object.fromEntries(new FormData(f).entries());
-    const btn = f.querySelector('button:not([type=button])');
+    const btn = e.submitter || f.querySelector('button:not([type=button])');
     const busy = on => { if (btn) { btn.disabled = on; btn.classList.toggle('busy', on); } };
     const tags = s => (s || '').split(',').map(t => t.trim().slice(0, 20)).filter(Boolean).slice(0, 10);
 
     if (kind === 'search') {
       if (cloud && v.q.trim()) { busy(true); try { await cloud.search(db, v.q); } catch (err) { console.error(err); } busy(false); }
       location.hash = '#/explore?' + new URLSearchParams({ q: v.q, sort: v.sort });
+    } else if (kind === 'login' && e.submitter && e.submitter.value === 'password') {
+      if (!v.password) { toast('비밀번호를 입력해주세요. 비밀번호가 없다면 로그인 링크를 받아주세요.'); return; }
+      busy(true);
+      try {
+        await cloud.signInPassword(v.email.trim(), v.password);
+      } catch (err) {
+        console.error(err);
+        busy(false);
+        toast(/rate|limit|too many/i.test(err.message || '') ? '잠시 후 다시 시도해주세요.' : '이메일 또는 비밀번호가 맞지 않아요. 비밀번호를 정하지 않았다면 로그인 링크를 받아주세요.');
+      }
+    } else if (kind === 'password') {
+      if (v.password !== v.password2) { toast('두 비밀번호가 달라요.'); return; }
+      busy(true);
+      try {
+        await cloud.setPassword(v.password);
+        closeModal(); toast('비밀번호를 저장했어요. 다음부터 메일 없이 로그인할 수 있어요.'); route(true);
+      } catch (err) { console.error(err); busy(false); toast(passwordError(err)); }
     } else if (kind === 'login') {
       busy(true);
       try {
@@ -1220,6 +1258,9 @@
       const now = new Date().toISOString();
       const fields = { name: v.name.trim().slice(0, 20) || '여행자', terms_agreed_at: now, location_agreed_at: v.location ? now : null, marketing_agreed: !!v.marketing };
       try {
+        if (v.password) {
+          try { await cloud.setPassword(v.password); } catch (err) { console.error(err); toast(passwordError(err) + ' 프로필의 계정 메뉴에서 다시 정할 수 있어요.'); }
+        }
         await push(cloud.updateProfile(fields));
         Object.assign(me(), { name: fields.name, termsAgreedAt: now, locationAgreedAt: fields.location_agreed_at, marketing: fields.marketing_agreed });
         toast('가입이 완료됐어요!');

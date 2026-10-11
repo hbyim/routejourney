@@ -209,6 +209,15 @@
         const redirectTo = location.origin + location.pathname;
         return ok(await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } }));
       },
+      async signInPassword(email, password) {
+        return ok(await sb.auth.signInWithPassword({ email, password }));
+      },
+      hasPassword() { return !!(api.user && api.user.user_metadata && api.user.user_metadata.has_password); },
+      async setPassword(password) {
+        const data = ok(await sb.auth.updateUser({ password, data: { has_password: true } }));
+        if (data && data.user) api.user = data.user;
+        return data;
+      },
       async signInOAuth(provider) {
         return ok(await sb.auth.signInWithOAuth({ provider, options: { redirectTo: location.origin + location.pathname } }));
       },
