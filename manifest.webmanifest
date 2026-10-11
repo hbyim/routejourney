@@ -1,0 +1,17 @@
+{
+  "name": "루트로그 RouteLog",
+  "short_name": "루트로그",
+  "description": "여행 포스팅이 여행가이드가 되고, 포크해서 다시 공유하는 여행 SNS",
+  "lang": "ko",
+  "start_url": "./#/",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f5f1",
+  "theme_color": "#0f766e",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
