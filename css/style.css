@@ -346,3 +346,11 @@ textarea.input { resize: vertical; }
 .pw-rules li.ok { color: var(--accent); }
 .linkish { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; cursor: pointer; text-decoration: underline; }
 .row.between { justify-content: space-between; }
+.place-search { display: grid; gap: 6px; }
+.row.nowrap { flex-wrap: nowrap; margin-top: 0; }
+.row.nowrap .input { flex: 1; min-width: 0; }
+.place-results { list-style: none; margin: 0; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); max-height: 260px; overflow: auto; }
+.place-results li.muted { padding: 8px 10px; font-size: .85rem; }
+.place-results button { display: grid; gap: 2px; width: 100%; text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: 8px; color: var(--text); font: inherit; cursor: pointer; }
+.place-results button:hover, .place-results button:focus-visible { background: var(--surface-2); }
+.place-results small { color: var(--muted); font-size: .78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -15,6 +15,8 @@ window.RL_CONFIG = {
   // 예: 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=YOUR_KEY'
   tileUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   tileAttribution: '&copy; OpenStreetMap',
+  // 장소 검색. 비워두면 tileUrl의 MapTiler 키를 쓰고, 그것도 없으면 OpenStreetMap Nominatim(무료, 소량 사용만 허용)을 씁니다.
+  geocodeKey: '',
 
   // 운영자 정보: 약관, 개인정보처리방침, 화면 하단에 표시됩니다.
   operator: {

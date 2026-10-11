@@ -628,7 +628,8 @@
         <div class="new-spot">
           <div class="grid2"><label>이름<input class="input" name="name" placeholder="예: 돈키호테 시부야점" maxlength="80"></label>
           <label>종류<select class="input" name="cat">${Object.entries(CATS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
-          <p class="small muted">지도를 눌러 위치를 정하세요.</p>
+          <p class="small muted">장소를 검색하거나 지도를 눌러 위치를 정하세요.</p>
+          ${placeSearchHtml()}
           <div class="map-box small-map" id="pickMap"></div>
           <input type="hidden" name="lat"><input type="hidden" name="lng">
         </div>
@@ -637,9 +638,85 @@
         <div class="row end"><button type="button" class="btn ghost" data-close>취소</button><button class="btn">추가</button></div>
       </form>`);
     const m = makeMap($('#pickMap'), { zoom: 12 });
-    if (m) attachPicker(m, $('#modal form'));
+    if (m) { const f = $('#modal form'); attachPlaceSearch($('#modal .place-search'), m, attachPicker(m, f), f); }
     $('#modal select[name=existing]').addEventListener('change', e => {
       $('#modal .new-spot').style.display = e.target.value ? 'none' : '';
+    });
+  }
+  /* ---------- 장소 검색 (지오코딩) ----------
+   * MapTiler 키가 있으면 MapTiler Geocoding, 없으면 OpenStreetMap Nominatim을 쓴다.
+   * Nominatim은 무료지만 초당 1회·자동완성 금지 정책이 있어, 사용자가 검색 버튼을 누를 때만 요청한다. */
+  function geocodeKey() {
+    if (CFG.geocodeKey) return CFG.geocodeKey;
+    const m = /api\.maptiler\.com.*[?&]key=([^&]+)/.exec(CFG.tileUrl || '');
+    return m ? m[1] : '';
+  }
+  const OSM_CAT = { restaurant: 'food', fast_food: 'food', food_court: 'food', bar: 'food', pub: 'food', izakaya: 'food', cafe: 'cafe', ice_cream: 'cafe', bakery: 'cafe', hotel: 'stay', hostel: 'stay', guest_house: 'stay', motel: 'stay', apartment: 'stay' };
+  function guessCat(cls, type) {
+    if (OSM_CAT[type]) return OSM_CAT[type];
+    if (cls === 'shop') return 'shop';
+    if (cls === 'tourism' || cls === 'historic' || cls === 'leisure' || cls === 'natural') return type === 'hotel' ? 'stay' : 'sight';
+    return '';
+  }
+  let lastGeocode = 0;
+  async function geocode(q, near) {
+    const key = geocodeKey();
+    if (key) {
+      const u = new URL(`https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json`);
+      u.search = new URLSearchParams({ key, language: 'ko', limit: '6', ...(near ? { proximity: `${near.lng},${near.lat}` } : {}) });
+      const r = await fetch(u); if (!r.ok) throw new Error('geocode ' + r.status);
+      const j = await r.json();
+      return (j.features || []).map(f => ({
+        name: f.text || f.place_name, addr: f.place_name || '', lat: f.center[1], lng: f.center[0],
+        cat: guessCat('', ((f.properties && f.properties.categories) || [])[0] || '')
+      }));
+    }
+    const wait = 1100 - (Date.now() - lastGeocode);
+    if (wait > 0) await new Promise(res => setTimeout(res, wait));
+    lastGeocode = Date.now();
+    const u = new URL('https://nominatim.openstreetmap.org/search');
+    const params = { q, format: 'jsonv2', limit: '6', 'accept-language': 'ko,en', addressdetails: '0' };
+    if (near) { const d = 0.6; params.viewbox = [near.lng - d, near.lat + d, near.lng + d, near.lat - d].join(','); }
+    u.search = new URLSearchParams(params);
+    const r = await fetch(u); if (!r.ok) throw new Error('geocode ' + r.status);
+    return (await r.json()).map(x => ({ name: x.name || String(x.display_name).split(',')[0], addr: x.display_name || '', lat: +x.lat, lng: +x.lon, cat: guessCat(x.category, x.type) }));
+  }
+  function placeSearchHtml() {
+    return `<div class="place-search">
+      <div class="row nowrap"><input class="input" type="search" data-place-q placeholder="장소·주소 검색 (예: 시부야 스카이)" enterkeyhint="search" autocomplete="off"><button type="button" class="btn sm" data-place-go>검색</button></div>
+      <ul class="place-results" data-place-results hidden></ul>
+    </div>`;
+  }
+  // 검색 결과를 누르면 핀을 옮기고, 이름·종류 칸이 비어 있으면 채운다
+  function attachPlaceSearch(box, m, set, form, label) {
+    if (!box || !m) return;
+    const qEl = box.querySelector('[data-place-q]'), list = box.querySelector('[data-place-results]');
+    let results = [];
+    const run = async () => {
+      const q = qEl.value.trim();
+      if (q.length < 2) { toast('검색어를 두 글자 이상 입력해주세요.'); return; }
+      list.hidden = false; list.innerHTML = '<li class="muted">찾는 중…</li>';
+      try {
+        const c = m.getCenter();
+        results = await geocode(q, { lat: c.lat, lng: c.lng });
+        list.innerHTML = results.length ? results.map((r, i) => `<li><button type="button" data-place-pick="${i}"><b>${esc(r.name)}</b><small>${esc(r.addr)}</small></button></li>`).join('')
+          : '<li class="muted">검색 결과가 없어요. 다른 이름이나 주소로 찾거나 지도를 눌러 정해주세요.</li>';
+      } catch (err) {
+        console.error(err);
+        list.innerHTML = '<li class="muted">검색하지 못했어요. 잠시 후 다시 시도하거나 지도를 눌러 정해주세요.</li>';
+      }
+    };
+    qEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); run(); } });
+    box.querySelector('[data-place-go]').addEventListener('click', run);
+    list.addEventListener('click', e => {
+      const b = e.target.closest('[data-place-pick]');
+      if (!b) return;
+      const r = results[+b.dataset.placePick];
+      set(r.lat, r.lng); m.setView([r.lat, r.lng], 16);
+      if (form.name && !form.name.value.trim()) form.name.value = r.name.slice(0, 80);
+      if (form.cat && r.cat) form.cat.value = r.cat;
+      list.hidden = true; qEl.value = r.name;
+      if (label) label.textContent = '검색한 위치를 넣었어요. 핀을 끌어 조정할 수 있어요.';
     });
   }
   function attachPicker(m, form, start) {
@@ -671,7 +748,8 @@
         <label>종류<select class="input" name="cat">${Object.entries(CATS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
       </div>
       <datalist id="spotNames">${Object.values(db.spots).map(s => `<option value="${esc(s.name)}">`).join('')}</datalist>
-      <div class="row between"><span class="small muted" id="locLabel">지도를 눌러 위치를 정하거나 현재 위치를 쓰세요.</span><button type="button" class="btn sm ghost" data-act="geo">현재 위치</button></div>
+      <div class="row between"><span class="small muted" id="locLabel">장소를 검색하거나, 지도를 누르거나, 현재 위치를 쓰세요.</span><button type="button" class="btn sm ghost" data-act="geo">현재 위치</button></div>
+      ${placeSearchHtml()}
       <div class="map-box small-map" id="postMap"></div>
       <input type="hidden" name="lat"><input type="hidden" name="lng">
       <label>한 줄 기록<textarea class="input" name="text" rows="3" maxlength="300" placeholder="여기서 뭐가 좋았나요? 다음 사람을 위한 팁도요."></textarea></label>
@@ -695,7 +773,7 @@
   function mountNew() {
     const form = $('form[data-form=post]');
     const m = makeMap($('#postMap'), { zoom: 12 });
-    if (m) postPicker = attachPicker(m, form);
+    if (m) { postPicker = attachPicker(m, form); attachPlaceSearch(form.querySelector('.place-search'), m, postPicker, form, $('#locLabel')); }
     const input = form.photo;
     input.addEventListener('change', async () => {
       const f = input.files[0];
@@ -1359,7 +1437,7 @@
       if (v.existing) s = db.spots[v.existing];
       else {
         if (!v.name.trim()) { toast('스팟 이름을 적어주세요.'); return; }
-        if (!v.lat) { toast('지도를 눌러 위치를 정해주세요.'); return; }
+        if (!v.lat) { toast('장소를 검색하거나 지도를 눌러 위치를 정해주세요.'); return; }
         const r = findOrCreateSpot({ name: v.name, cat: v.cat, lat: +v.lat, lng: +v.lng, area: g.city });
         s = r.spot;
         if (r.created && cloud) quiet(push(cloud.addSpot(s)));
@@ -1370,7 +1448,7 @@
       quiet(syncGuide(g));
     } else if (kind === 'post') {
       if (!requireAuth()) return;
-      if (!v.lat) { toast('지도를 눌러 위치를 정해주세요.'); return; }
+      if (!v.lat) { toast('장소를 검색하거나 지도를 눌러 위치를 정해주세요.'); return; }
       busy(true);
       const at = v.at ? new Date(v.at).toISOString() : new Date().toISOString();
       let gid = v.guide;
