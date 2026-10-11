@@ -22,4 +22,4 @@ jobs:
           curl -s "$U/auth/v1/settings" -H "apikey: $K"; echo
           echo "== storage public object path (bucket exists => 400/404 object, not bucket)"
           curl -s -w ' %{http_code}\n' "$U/storage/v1/object/public/photos/none.jpg" | head -c 300; echo
-          sleep 1; while IFS= read -r l; do echo "::notice::$l"; done < /tmp/out
+          sleep 1; echo "::notice::$(sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g' /tmp/out)"
