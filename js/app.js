@@ -6,8 +6,8 @@
   const DB_KEY = 'routelog.v1';
   const TOKYO = [35.6812, 139.7671];
   const CATS = {
-    sight: { label: '관광', color: '#0f766e' },
-    food: { label: '식당', color: '#c2410c' },
+    sight: { label: '관광', color: '#c2410c' },
+    food: { label: '식당', color: '#be185d' },
     cafe: { label: '카페', color: '#a16207' },
     shop: { label: '쇼핑', color: '#7c3aed' },
     stay: { label: '숙소', color: '#2563eb' },
@@ -41,7 +41,7 @@
     if (!p || !p.then) return p;
     return p.catch(err => {
       console.error(err);
-      toast(navigator.onLine === false ? '오프라인이에요. 연결되면 다시 시도해주세요.' : '서버에 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
+      toast(navigator.onLine === false ? '오프라인이에요. 연결되면 다시 시도해주세요.' : err && err.userMessage || '서버에 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
       throw err;
     });
   }
@@ -52,7 +52,35 @@
   /* ---------- 유틸 ---------- */
   const $ = (s, el = document) => el.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const yen = n => n ? '¥' + Number(n).toLocaleString('ko-KR') : '무료';
+  // 쓴 돈은 정수로 저장한다. 원·엔은 그 단위 그대로, 달러·위안은 센트·펀(1/100) 단위로 저장한다.
+  // 통화가 없는 예전 기록은 엔으로 본다.
+  const CURRENCIES = {
+    KRW: { label: '원', dec: 0, fmt: v => v + '원' },
+    JPY: { label: '엔', dec: 0, fmt: v => v + '엔' },
+    USD: { label: '$', dec: 2, fmt: v => '$' + v },
+    CNY: { label: '위안', dec: 2, fmt: v => v + '위안' }
+  };
+  const curOf = c => CURRENCIES[c] ? c : 'JPY';
+  const toMinor = (v, c) => Math.max(0, Math.round((+v || 0) * (CURRENCIES[curOf(c)].dec ? 100 : 1)));
+  function money(n, c) {
+    if (!n) return '무료';
+    const cur = CURRENCIES[curOf(c)];
+    const v = cur.dec ? n / 100 : n;
+    return cur.fmt(v.toLocaleString('ko-KR', { minimumFractionDigits: cur.dec && n % 100 ? 2 : 0, maximumFractionDigits: cur.dec }));
+  }
+  // 통화가 섞인 합계는 통화별로 따로 더해 이어 붙인다
+  function moneySum(posts) {
+    const by = {};
+    posts.forEach(p => { if (p && p.cost) by[curOf(p.currency)] = (by[curOf(p.currency)] || 0) + p.cost; });
+    const keys = Object.keys(CURRENCIES).filter(k => by[k]);
+    return keys.length ? keys.map(k => money(by[k], k)).join(' + ') : '무료';
+  }
+  function lastCurrency(set) {
+    try {
+      if (set) localStorage.setItem('routelog.currency', set);
+      return curOf(localStorage.getItem('routelog.currency'));
+    } catch (e) { return curOf(set); }
+  }
   function fmtTime(iso) {
     // 현지 시차가 적힌 기록(예: +09:00)은 그 현지 시각 그대로 보여준다
     const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d).*([+-]\d\d:\d\d)$/.exec(iso || '');
@@ -122,6 +150,34 @@
     if (post && post.photo) return `<img class="photo ${cls}" src="${esc(post.photo)}" alt="${esc(spot.name)} 사진" loading="lazy">`;
     const c = CATS[spot.cat] || CATS.etc;
     return `<div class="photo ph ${cls}" style="--ph:${c.color}" role="img" aria-label="${esc(spot.name)}"><span>${esc(spot.name)}</span></div>`;
+  }
+  // 사진이 없는 가이드 커버: 스팟 좌표를 카드 크기에 맞춰 그 가이드의 루트를 그린다
+  function routeCover(g) {
+    const pts = orderedItems(g).map(itemSpot).filter(s => s && isFinite(s.lat) && isFinite(s.lng)).slice(0, 12);
+    const W = 320, H = 200, P = 30;
+    let seed = 0;
+    for (const ch of String(g.id)) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+    const rnd = () => { seed = (Math.imul(seed, 1103515245) + 12345) >>> 0; return seed / 4294967296; };
+    const roads = [0, 1, 2, 3].map(i => {
+      const a = rnd(), b = rnd();
+      return i % 2 ? `M${(a * W).toFixed(0)} 0L${(b * W).toFixed(0)} ${H}` : `M0 ${(a * H).toFixed(0)}L${W} ${(b * H).toFixed(0)}`;
+    }).join('');
+    const wy = (0.55 + rnd() * 0.3) * H;
+    const water = `M-10 ${wy.toFixed(0)}C${W * 0.3} ${(wy - 30).toFixed(0)},${W * 0.6} ${(wy + 30).toFixed(0)},${W + 10} ${(wy - 10).toFixed(0)}`;
+    let xy = [];
+    if (pts.length) {
+      const k = Math.cos((pts[0].lat * Math.PI) / 180);
+      const xs = pts.map(s => s.lng * k), ys = pts.map(s => -s.lat);
+      const x0 = Math.min(...xs), y0 = Math.min(...ys), dx = Math.max(...xs) - x0, dy = Math.max(...ys) - y0;
+      // 아래쪽은 커버 배지가 덮으므로 위쪽보다 여백을 더 둔다
+      const top = 22, bottom = 52;
+      const sc = Math.min(dx ? (W - 2 * P) / dx : Infinity, dy ? (H - top - bottom) / dy : Infinity);
+      const s = isFinite(sc) ? sc : 0;
+      xy = pts.map((_, i) => [(W - dx * s) / 2 + (xs[i] - x0) * s, top + (H - top - bottom - dy * s) / 2 + (ys[i] - y0) * s]);
+    }
+    const line = xy.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('');
+    const dots = xy.map((p, i) => `<circle class="rc-dot${i === xy.length - 1 && i > 0 ? ' last' : ''}" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="10"/><text x="${p[0].toFixed(1)}" y="${(p[1] + 4).toFixed(1)}" text-anchor="middle">${i + 1}</text>`).join('');
+    return `<span class="route-cover" role="img" aria-label="${esc(g.title)} 루트 지도"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path class="rc-water" d="${water}" stroke-width="22"/><path class="rc-road" d="${roads}" stroke-width="6"/>${xy.length > 1 ? `<path class="rc-halo" d="${line}"/><path class="rc-line" d="${line}"/>` : ''}${dots}</svg></span>`;
   }
   function stars(n) {
     if (!n) return '';
@@ -302,7 +358,7 @@
       iconSize: [28, 28], iconAnchor: [14, 14]
     });
   }
-  const dayColor = d => ['#0f766e', '#c2410c', '#7c3aed', '#2563eb', '#be185d', '#a16207'][(d - 1) % 6];
+  const dayColor = d => ['#c2410c', '#7c3aed', '#2563eb', '#be185d', '#a16207', '#0f766e'][(d - 1) % 6];
   function drawRoute(m, g, onClick) {
     const pts = [];
     let n = 0;
@@ -348,7 +404,7 @@
     const c = coverOf(g);
     const parent = g.forkedFrom && db.guides[g.forkedFrom];
     return `<article class="card guide-card">
-      <a href="#/guide/${esc(g.id)}" class="cover-link">${photoBox(c.post, c.spot, 'cover')}
+      <a href="#/guide/${esc(g.id)}" class="cover-link">${c.post && c.post.photo ? photoBox(c.post, c.spot, 'cover') : routeCover(g)}
         <span class="cover-badge">${esc(g.city)} · ${days(g).length}일 · 스팟 ${g.items.length}</span>
         ${isMine(g) && g.visibility !== 'public' ? `<span class="vis-badge">${VIS[g.visibility]}</span>` : ''}</a>
       <div class="card-body">
@@ -376,7 +432,7 @@
         <a href="#/spot/${esc(s.id)}" class="spot-line">${catChip(s.cat)}<b>${esc(s.name)}</b><span class="muted">${esc(s.area || '')}</span></a>
         ${mine && p.hidden ? '<p class="warn small">신고 누적으로 숨김 처리된 포스팅이에요.</p>' : ''}
         <p>${esc(p.text)}</p>
-        <div class="meta-row">${stars(p.rating)}<span class="muted">${yen(p.cost)}</span></div>
+        <div class="meta-row">${stars(p.rating)}<span class="muted">${money(p.cost, p.currency)}</span></div>
         ${inGuides.length ? `<p class="small muted">수록 가이드: ${inGuides.slice(0, 2).map(g => `<a href="#/guide/${esc(g.id)}">${esc(g.title)}</a>`).join(', ')}${inGuides.length > 2 ? ` 외 ${inGuides.length - 2}개` : ''}</p>` : ''}
       </div>
     </article>`;
@@ -474,7 +530,7 @@
     const doneN = g.items.filter(i => doneMap[i.id]).length;
     const nextIt = following ? orderedItems(g).find(i => !doneMap[i.id] && itemSpot(i)) : null;
     const nextSpot = nextIt && itemSpot(nextIt);
-    const totalCost = g.items.reduce((sum, it) => sum + ((itemPost(it) || {}).cost || 0), 0);
+    const totalCost = moneySum(g.items.map(itemPost));
     let n = 0;
 
     return `<div class="guide-page">
@@ -487,7 +543,7 @@
         ${mine && g.hidden ? '<p class="warn">신고 누적으로 다른 사람에게 숨김 처리된 가이드예요. 문의로 검토를 요청할 수 있어요.</p>' : ''}
         <p>${esc(g.desc)}</p>
         <div class="meta-row">
-          <a class="who" href="#/user/${esc(owner.id)}">${avatar(owner, 32)}<span><b>${esc(owner.name)}</b><small class="muted">${esc(g.city)} · ${days(g).length}일 · 스팟 ${total}곳 · 지출 약 ${yen(totalCost)}</small></span></a>
+          <a class="who" href="#/user/${esc(owner.id)}">${avatar(owner, 32)}<span><b>${esc(owner.name)}</b><small class="muted">${esc(g.city)} · ${days(g).length}일 · 스팟 ${total}곳 · 지출 약 ${totalCost}</small></span></a>
         </div>
         <div class="action-row">
           <button class="btn icon-btn ${db.likes[g.id] ? 'on' : ''}" data-act="like" data-id="${esc(g.id)}" aria-pressed="${!!db.likes[g.id]}">♥ ${likeCount(g)}</button>
@@ -527,7 +583,7 @@
                 </div>
                 ${p ? `<div class="stop-post">${photoBox(p, s, 'thumb')}<div>
                   <p>${esc(p.text)}</p>
-                  <p class="small muted">${stars(p.rating)} ${yen(p.cost)} · ${fmtTime(p.at)}${by && by.id !== g.ownerId ? ` · ${esc(by.name)}님의 기록` : ''}</p>
+                  <p class="small muted">${stars(p.rating)} ${money(p.cost, p.currency)} · ${fmtTime(p.at)}${by && by.id !== g.ownerId ? ` · ${esc(by.name)}님의 기록` : ''}</p>
                 </div></div>` : ''}
                 ${it.note ? `<p class="note">메모: ${esc(it.note)}</p>` : ''}
               </div>
@@ -728,7 +784,7 @@
     const set = (lat, lng) => {
       form.lat.value = lat.toFixed(6); form.lng.value = lng.toFixed(6);
       if (mk) mk.setLatLng([lat, lng]);
-      else mk = L.marker([lat, lng], { draggable: true, icon: pin('●', '#0f766e', true) }).addTo(m).on('dragend', e => { const p = e.target.getLatLng(); set(p.lat, p.lng); });
+      else mk = L.marker([lat, lng], { draggable: true, icon: pin('●', '#c2410c', true) }).addTo(m).on('dragend', e => { const p = e.target.getLatLng(); set(p.lat, p.lng); });
     };
     m.on('click', e => set(e.latlng.lat, e.latlng.lng));
     if (start) { set(start[0], start[1]); m.setView(start, 15); }
@@ -758,7 +814,7 @@
       <label>한 줄 기록<textarea class="input" name="text" rows="3" maxlength="300" placeholder="여기서 뭐가 좋았나요? 다음 사람을 위한 팁도요."></textarea></label>
       <div class="grid3">
         <label>별점<select class="input" name="rating"><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label>
-        <label>쓴 돈 (엔)<input class="input" type="number" name="cost" min="0" max="100000000" step="10" placeholder="0"></label>
+        <label>쓴 돈<span class="money-input"><input class="input" type="number" name="cost" min="0" max="100000000" step="any" inputmode="decimal" placeholder="0"><select class="input" name="currency" aria-label="통화">${Object.entries(CURRENCIES).map(([k, c]) => `<option value="${k}" ${k === lastCurrency() ? 'selected' : ''}>${c.label}</option>`).join('')}</select></span></label>
         <label>방문 시각<input class="input" type="datetime-local" name="at" value="${local}"></label>
       </div>
       <label>태그 (쉼표로 구분)<input class="input" name="tags" placeholder="야경, 예약필수" maxlength="100"></label>
@@ -1465,9 +1521,10 @@
       const photo = f.dataset.photo || null;
       const p = {
         id: uid('p'), userId: db.me, spotId: s.id, at, text: v.text.trim().slice(0, 300), rating: +v.rating || null,
-        cost: Math.max(0, Math.round(+v.cost || 0)), tags: tags(v.tags), photo
+        cost: toMinor(v.cost, v.currency), currency: curOf(v.currency), tags: tags(v.tags), photo
       };
       db.posts[p.id] = p;
+      lastCurrency(p.currency);
       if (g) {
         g.items.push({ id: uid('i'), postId: p.id, spotId: s.id, day: dayOf(g, at), note: '', by: db.me });
         // 같은 날 안에서는 방문 시각 순으로 정렬

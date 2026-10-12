@@ -22,7 +22,7 @@
     /* ---------- 행 ↔ 앱 모델 ---------- */
     const toUser = r => ({ id: r.id, name: r.name, bio: r.bio || '', color: r.color, activeTripId: r.active_trip_id, termsAgreedAt: r.terms_agreed_at, locationAgreedAt: r.location_agreed_at, marketing: r.marketing_agreed });
     const toSpot = r => ({ id: r.id, name: r.name, cat: r.cat, lat: r.lat, lng: r.lng, area: r.area || '' });
-    const toPost = r => ({ id: r.id, userId: r.user_id, spotId: r.spot_id, at: r.at, text: r.text || '', rating: r.rating, cost: r.cost || 0, tags: r.tags || [], photo: r.photo_url, hidden: r.hidden });
+    const toPost = r => ({ id: r.id, userId: r.user_id, spotId: r.spot_id, at: r.at, text: r.text || '', rating: r.rating, cost: r.cost || 0, currency: r.currency || 'JPY', tags: r.tags || [], photo: r.photo_url, hidden: r.hidden });
     const toGuide = (r, likes, saves) => ({
       id: r.id, ownerId: r.owner_id, title: r.title, city: r.city || '', desc: r.descr || '', startDate: r.start_date,
       forkedFrom: r.forked_from, forkedFromTitle: r.forked_from_title, tags: r.tags || [], visibility: r.visibility,
@@ -198,7 +198,14 @@
       createPost: (p, photoDataUrl) => q(async () => {
         let url = null;
         if (photoDataUrl) url = await api.uploadPhoto(p.id, photoDataUrl);
-        await sb.from('posts').insert({ id: p.id, user_id: api.user.id, spot_id: p.spotId, at: p.at, text: p.text, rating: p.rating, cost: p.cost, tags: p.tags, photo_url: url }).then(ok);
+        const row = { id: p.id, user_id: api.user.id, spot_id: p.spotId, at: p.at, text: p.text, rating: p.rating, cost: p.cost, currency: p.currency || 'JPY', tags: p.tags, photo_url: url };
+        const res = await sb.from('posts').insert(row);
+        if (res.error && /currency/.test(res.error.message || '')) {
+          // posts.currency 열을 아직 추가하지 않은 DB: 엔은 예전처럼 저장하고, 다른 통화는 잘못된 금액이 남지 않게 막는다
+          if (row.currency !== 'JPY') throw Object.assign(new Error(res.error.message), { userMessage: '아직 엔 외의 통화는 저장할 수 없어요. 운영자에게 알려주세요.' });
+          delete row.currency;
+          await sb.from('posts').insert(row).then(ok);
+        } else ok(res);
         return url;
       }),
       deletePost: id => q(async () => {

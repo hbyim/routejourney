@@ -34,6 +34,7 @@ create table if not exists public.posts (
   text text not null default '' check (char_length(text) <= 300),
   rating smallint check (rating between 1 and 5),
   cost integer not null default 0 check (cost >= 0),
+  currency text not null default 'JPY' check (currency in ('KRW', 'JPY', 'USD', 'CNY')),
   tags text[] not null default '{}',
   photo_url text,
   hidden boolean not null default false,
@@ -118,6 +119,9 @@ create table if not exists public.reports (
   created_at timestamptz not null default now(),
   unique (reporter_id, target_type, target_id)
 );
+
+-- 이미 만든 DB에 쓴 돈 통화 열을 더한다 (원·엔은 그대로, 달러·위안은 1/100 단위로 cost에 저장)
+alter table public.posts add column if not exists currency text not null default 'JPY' check (currency in ('KRW', 'JPY', 'USD', 'CNY'));
 
 create index if not exists posts_user_idx on public.posts (user_id, at desc);
 create index if not exists posts_spot_idx on public.posts (spot_id);
