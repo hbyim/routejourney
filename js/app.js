@@ -274,7 +274,7 @@
     return ng;
   }
   function findOrCreateSpot({ name, cat, lat, lng, area }) {
-    const near = Object.values(db.spots).find(s => s.name.trim() === name.trim() && distM(s, { lat, lng }) < 300);
+    const near = Object.values(db.spots).find(s => s.name.trim() === name.trim() && s.cat === cat && distM(s, { lat, lng }) < 300);
     if (near) return { spot: near, created: false };
     const s = { id: uid('s'), name: name.trim().slice(0, 80), cat, lat, lng, area: (area || '').slice(0, 40) };
     db.spots[s.id] = s;
@@ -585,7 +585,7 @@
                 </div>
                 ${p ? `<div class="stop-post">${photoBox(p, s, 'thumb')}<div>
                   <p>${esc(p.text)}</p>
-                  <p class="small muted">${stars(p.rating)} ${money(p.cost, p.currency)} · ${fmtTime(p.at)}${by && by.id !== g.ownerId ? ` · ${esc(by.name)}님의 기록` : ''}</p>
+                  <p class="small muted">${stars(p.rating)} ${money(p.cost, p.currency)} · ${fmtTime(p.at)}${by && by.id !== g.ownerId ? ` · ${esc(by.name)}님의 기록` : ''}${p.userId === db.me ? ` · <a href="#/post/${esc(p.id)}/edit">수정</a>` : ''}</p>
                 </div></div>` : ''}
                 ${it.note ? `<p class="note">메모: ${esc(it.note)}</p>` : ''}
               </div>
@@ -662,7 +662,7 @@
         n++;
         return `<li class="card edit-item">
           <span class="num" style="--pin:${(CATS[s.cat] || CATS.etc).color}">${n}</span>
-          <div class="grow"><b>${esc(s.name)}</b> ${catChip(s.cat)}<br>
+          <div class="grow"><b>${esc(s.name)}</b> ${catChip(s.cat)}${it.postId && db.posts[it.postId] && db.posts[it.postId].userId === db.me ? ` <a class="small" href="#/post/${esc(it.postId)}/edit">포스팅 수정</a>` : ''}<br>
             <input class="input sm" data-act="note" data-g="${esc(g.id)}" data-i="${esc(it.id)}" value="${esc(it.note)}" maxlength="200" placeholder="메모 추가 (예: 오전 10시 입장 추천)" aria-label="${esc(s.name)} 메모"></div>
           <label class="day-sel">Day <input class="input sm" type="number" min="1" max="60" value="${day}" data-act="setday" data-g="${esc(g.id)}" data-i="${esc(it.id)}"></label>
           <div class="btns">
@@ -794,33 +794,44 @@
   }
 
   /* ---------- 화면: 포스팅 ---------- */
-  function viewNew() {
+  // 새 포스팅과 포스팅 수정이 같은 폼을 쓴다. editId가 있으면 그 포스팅 값으로 채운다.
+  function viewNew(editId) {
+    const p = editId ? db.posts[editId] : null;
+    if (editId && !p) return notFound();
+    if (p && p.userId !== db.me) return `<p class="empty">내 포스팅만 수정할 수 있어요.</p>`;
+    const sp = p ? db.spots[p.spotId] : null;
     const mine = guidesArr().filter(isMine);
     const active = db.activeTripId;
-    const now = new Date();
-    const local = new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    return `<div class="page-head"><h1>스팟 포스팅</h1><p class="muted">사진 한 장과 한 줄이면 충분해요. 올리면 선택한 가이드에 시간순으로 쌓여요.</p></div>
-    <form class="card form" data-form="post">
+    const when = p ? new Date(p.at) : new Date();
+    const local = new Date(when - when.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const cur = p ? curOf(p.currency) : lastCurrency();
+    const costVal = p && p.cost ? (CURRENCIES[cur].dec ? p.cost / 100 : p.cost) : '';
+    const rating = p && p.rating ? p.rating : 5;
+    return `${p ? `<a class="back" href="#/" data-act="back">← 뒤로</a>` : ''}
+    <div class="page-head"><h1>${p ? '포스팅 수정' : '스팟 포스팅'}</h1><p class="muted">${p ? '올릴 때와 같은 항목을 고칠 수 있어요. 담긴 가이드는 그대로예요.' : '사진 한 장과 한 줄이면 충분해요. 올리면 선택한 가이드에 시간순으로 쌓여요.'}</p></div>
+    <form class="card form" data-form="post"${p ? ` data-id="${esc(p.id)}"` : ''}>
       <label class="photo-drop" id="photoDrop">
         <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" name="photo" hidden>
-        <span id="photoPreview" class="photo-preview"><b>사진 추가</b><small>탭해서 사진 선택 · 촬영 위치 정보는 지워져요</small></span>
+        <span id="photoPreview" class="photo-preview">${p && p.photo ? `<img src="${esc(p.photo)}" alt="지금 사진">` : `<b>사진 추가</b><small>탭해서 사진 선택 · 촬영 위치 정보는 지워져요</small>`}</span>
       </label>
+      ${p && p.photo ? '<p class="small muted">사진을 누르면 다른 사진으로 바꿀 수 있어요.</p>' : ''}
       <div class="grid2">
-        <label>스팟 이름<input class="input" name="name" required maxlength="80" placeholder="예: 시부야 스카이 전망대" list="spotNames"></label>
-        <label>종류<select class="input" name="cat">${Object.entries(CATS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
+        <label>스팟 이름<input class="input" name="name" required maxlength="80" placeholder="예: 시부야 스카이 전망대" list="spotNames" value="${sp ? esc(sp.name) : ''}"></label>
+        <label>종류<select class="input" name="cat">${Object.entries(CATS).map(([k, v]) => `<option value="${k}" ${sp && sp.cat === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label>
       </div>
       <datalist id="spotNames">${Object.values(db.spots).map(s => `<option value="${esc(s.name)}">`).join('')}</datalist>
       <div class="row between"><span class="small muted" id="locLabel">지도 위 검색창으로 장소를 찾거나, 지도를 누르거나, 현재 위치를 쓰세요.</span><button type="button" class="btn sm ghost" data-act="geo">현재 위치</button></div>
       ${pickMapHtml('postMap')}
       <input type="hidden" name="lat"><input type="hidden" name="lng">
-      <label>한 줄 기록<textarea class="input" name="text" rows="3" maxlength="300" placeholder="여기서 뭐가 좋았나요? 다음 사람을 위한 팁도요."></textarea></label>
+      <label>한 줄 기록<textarea class="input" name="text" rows="3" maxlength="300" placeholder="여기서 뭐가 좋았나요? 다음 사람을 위한 팁도요.">${p ? esc(p.text) : ''}</textarea></label>
       <div class="grid3">
-        <label>별점<select class="input" name="rating"><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select></label>
-        <label>쓴 돈<span class="money-input"><input class="input" type="number" name="cost" min="0" max="100000000" step="any" inputmode="decimal" placeholder="0"><select class="input" name="currency" aria-label="통화">${Object.entries(CURRENCIES).map(([k, c]) => `<option value="${k}" ${k === lastCurrency() ? 'selected' : ''}>${c.label}</option>`).join('')}</select></span></label>
+        <label>별점<select class="input" name="rating">${[5, 4, 3, 2, 1].map(n => `<option value="${n}" ${n === rating ? 'selected' : ''}>${'★'.repeat(n)}</option>`).join('')}</select></label>
+        <label>쓴 돈<span class="money-input"><input class="input" type="number" name="cost" min="0" max="100000000" step="any" inputmode="decimal" placeholder="0" value="${costVal}"><select class="input" name="currency" aria-label="통화">${Object.entries(CURRENCIES).map(([k, c]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${c.label}</option>`).join('')}</select></span></label>
         <label>방문 시각<input class="input" type="datetime-local" name="at" value="${local}"></label>
       </div>
-      <label>태그 (쉼표로 구분)<input class="input" name="tags" placeholder="야경, 예약필수" maxlength="100"></label>
-      <label>담을 가이드
+      <label>태그 (쉼표로 구분)<input class="input" name="tags" placeholder="야경, 예약필수" maxlength="100" value="${p ? esc((p.tags || []).join(', ')) : ''}"></label>
+      ${p ? `<div class="row end"><button type="button" class="btn ghost" data-act="back">취소</button><button class="btn big" type="submit">저장</button></div>
+    </form>` : `<label>담을 가이드
         <select class="input" name="guide">
           <option value="__new" ${!active ? 'selected' : ''}>새 여행 가이드 만들기</option>
           ${mine.map(g => `<option value="${esc(g.id)}" ${g.id === active ? 'selected' : ''}>${esc(g.title)}${g.id === active ? ' (여행 중)' : ''}</option>`).join('')}
@@ -828,13 +839,18 @@
         </select></label>
       <p class="small muted">올린 포스팅과 장소는 공개 가이드에 담기면 다른 사람에게 보여요. 남의 사진이나 다른 사람의 얼굴이 크게 나온 사진은 올리지 말아주세요.</p>
       <div class="row end"><button class="btn big" type="submit">올리기</button></div>
-    </form>`;
+    </form>`}`;
   }
   let postPicker = null;
-  function mountNew() {
+  function mountNew(editId) {
     const form = $('form[data-form=post]');
+    if (!form) return;
+    const p = editId ? db.posts[editId] : null;
+    const sp = p ? db.spots[p.spotId] : null;
     const m = makeMap($('#postMap'), { zoom: 12, zoomPos: 'bottomright' });
-    if (m) { postPicker = attachPicker(m, form); attachPlaceSearch(form.querySelector('.place-search'), m, postPicker, form, $('#locLabel')); }
+    if (m) { postPicker = attachPicker(m, form, sp ? [sp.lat, sp.lng] : null); attachPlaceSearch(form.querySelector('.place-search'), m, postPicker, form, $('#locLabel')); }
+    else if (sp) { form.lat.value = sp.lat; form.lng.value = sp.lng; }
+    if (sp) $('#locLabel').textContent = '지금 위치예요. 지도를 누르거나 핀을 끌어 바꿀 수 있어요.';
     const input = form.photo;
     input.addEventListener('change', async () => {
       const f = input.files[0];
@@ -1142,12 +1158,13 @@
     const head = parts[0] || '';
 
     if (needsConsent() && !['welcome', 'legal'].includes(head)) { location.replace('#/welcome'); return; }
-    const needLogin = cloud && !db.me && ['new', 'trips', 'me', 'welcome'].includes(head) || (cloud && !db.me && head === 'guide' && parts[2] === 'edit');
+    const needLogin = cloud && !db.me && ['new', 'trips', 'me', 'welcome'].includes(head) || (cloud && !db.me && (head === 'guide' || head === 'post') && parts[2] === 'edit');
 
     if (needLogin) { if (head !== 'welcome') sessionStorageSet('routelog.next', '#' + raw); html = viewLogin(); nav = 'me'; }
     else if (!head) { html = viewFeed(); nav = 'feed'; }
     else if (head === 'explore') { html = viewExplore(q); mount = mountExplore; nav = 'explore'; }
-    else if (head === 'new') { html = viewNew(); mount = mountNew; nav = 'new'; }
+    else if (head === 'new') { html = viewNew(); mount = () => mountNew(); nav = 'new'; }
+    else if (head === 'post' && parts[2] === 'edit') { html = viewNew(parts[1]); mount = () => mountNew(parts[1]); nav = 'me'; }
     else if (head === 'trips') { html = viewTrips(); nav = 'trips'; }
     else if (head === 'me') { html = viewUser(db.me); nav = 'me'; }
     else if (head === 'login' || head === 'signup') { html = viewLogin(head); nav = 'me'; }
@@ -1230,8 +1247,13 @@
         const p = db.posts[id];
         const mine = p && p.userId === db.me;
         openModal(`<h2>포스팅</h2><div class="menu-list">
-          ${mine ? `<button class="btn ghost block danger" data-act="delete-post" data-id="${esc(id)}">포스팅 삭제</button>` : `<button class="btn ghost block" data-act="report" data-type="post" data-id="${esc(id)}">신고</button><button class="btn ghost block" data-act="block" data-id="${esc(p.userId)}">${esc(userOf(p.userId).name)}님 차단</button>`}
+          ${mine ? `<button class="btn ghost block" data-act="edit-post" data-id="${esc(id)}">포스팅 수정</button><button class="btn ghost block danger" data-act="delete-post" data-id="${esc(id)}">포스팅 삭제</button>` : `<button class="btn ghost block" data-act="report" data-type="post" data-id="${esc(id)}">신고</button><button class="btn ghost block" data-act="block" data-id="${esc(p.userId)}">${esc(userOf(p.userId).name)}님 차단</button>`}
           <button class="btn ghost block" data-close>닫기</button></div>`);
+        break;
+      }
+      case 'edit-post': {
+        closeModal();
+        location.hash = '#/post/' + id + '/edit';
         break;
       }
       case 'delete-post': {
@@ -1507,6 +1529,48 @@
       g.items = orderedItems(g);
       save(); closeModal(); route(true); toast(`「${s.name}」을 추가했어요.`);
       quiet(syncGuide(g));
+    } else if (kind === 'post' && f.dataset.id) {
+      if (!requireAuth()) return;
+      const p = db.posts[f.dataset.id];
+      if (!p || p.userId !== db.me) return;
+      if (!v.name.trim()) { toast('스팟 이름을 적어주세요.'); return; }
+      if (!v.lat) { toast('장소를 검색하거나 지도를 눌러 위치를 정해주세요.'); return; }
+      busy(true);
+      const before = JSON.parse(JSON.stringify(p));
+      const old = db.spots[p.spotId];
+      const r = findOrCreateSpot({ name: v.name, cat: v.cat, lat: +v.lat, lng: +v.lng, area: old ? old.area : '' });
+      const s = r.spot;
+      const photo = f.dataset.photo || null;
+      Object.assign(p, {
+        spotId: s.id, at: v.at ? new Date(v.at).toISOString() : p.at, text: v.text.trim().slice(0, 300), rating: +v.rating || null,
+        cost: toMinor(v.cost, v.currency), currency: curOf(v.currency), tags: tags(v.tags)
+      });
+      if (photo) p.photo = photo;
+      lastCurrency(p.currency);
+      // 내 가이드에 담긴 이 포스팅은 스팟과 날짜를 함께 맞추고 방문 시각 순으로 다시 정렬한다
+      const touched = guidesArr().filter(g => isMine(g) && g.items.some(i => i.postId === p.id));
+      const itemsBefore = touched.map(g => JSON.parse(JSON.stringify(g.items)));
+      touched.forEach(g => {
+        g.items.forEach(i => { if (i.postId === p.id) { i.spotId = s.id; i.day = dayOf(g, p.at); } });
+        g.items.sort((a, b) => a.day - b.day || ((db.posts[a.postId] || {}).at || '').localeCompare((db.posts[b.postId] || {}).at || ''));
+      });
+      if (cloud) {
+        try {
+          if (r.created) await push(cloud.addSpot(s));
+          const url = await push(cloud.updatePost(p, photo));
+          if (url) p.photo = url;
+          for (const g of touched) await syncGuide(g);
+        } catch (err) {
+          // 실패하면 화면에서도 되돌린다
+          Object.keys(p).forEach(k => delete p[k]);
+          Object.assign(p, before);
+          touched.forEach((g, n) => { g.items = itemsBefore[n]; });
+          busy(false);
+          return;
+        }
+      } else if (!save() && photo) { p.photo = before.photo; save(); }
+      toast('포스팅을 고쳤어요.');
+      if (history.length > 1) history.back(); else location.hash = '#/';
     } else if (kind === 'post') {
       if (!requireAuth()) return;
       if (!v.lat) { toast('장소를 검색하거나 지도를 눌러 위치를 정해주세요.'); return; }

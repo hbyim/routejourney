@@ -209,6 +209,19 @@
         } else ok(res);
         return url;
       }),
+      // 사진을 바꾸면 같은 경로의 예전 파일을 지우고 새로 올린다 (덮어쓰기 권한이 없어서).
+      // 주소 뒤에 버전을 붙여 브라우저·CDN에 남은 예전 사진 대신 새 사진이 보이게 한다.
+      updatePost: (p, photoDataUrl) => q(async () => {
+        let url = null;
+        if (photoDataUrl) {
+          await sb.storage.from('photos').remove([`${api.user.id}/${p.id}.jpg`]);
+          url = (await api.uploadPhoto(p.id, photoDataUrl)) + '?v=' + Date.now();
+        }
+        const row = { spot_id: p.spotId, at: p.at, text: p.text, rating: p.rating, cost: p.cost, currency: p.currency || 'JPY', tags: p.tags };
+        if (url) row.photo_url = url;
+        await sb.from('posts').update(row).eq('id', p.id).eq('user_id', api.user.id).then(ok);
+        return url;
+      }),
       deletePost: id => q(async () => {
         await sb.from('posts').delete().eq('id', id).then(ok);
         await sb.storage.from('photos').remove([`${api.user.id}/${id}.jpg`]);
