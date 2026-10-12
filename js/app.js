@@ -6,7 +6,7 @@
   const DB_KEY = 'routelog.v1';
   const TOKYO = [35.6812, 139.7671];
   const CATS = {
-    sight: { label: '관광', color: '#c2410c' },
+    sight: { label: '관광', color: '#0e6b73' },
     food: { label: '식당', color: '#be185d' },
     cafe: { label: '카페', color: '#a16207' },
     shop: { label: '쇼핑', color: '#7c3aed' },
@@ -360,7 +360,7 @@
       iconSize: [28, 28], iconAnchor: [14, 14]
     });
   }
-  const dayColor = d => ['#c2410c', '#7c3aed', '#2563eb', '#be185d', '#a16207', '#0f766e'][(d - 1) % 6];
+  const dayColor = d => ['#0e6b73', '#6b3fa0', '#2563eb', '#be185d', '#a16207', '#c2410c'][(d - 1) % 6];
   function drawRoute(m, g, onClick) {
     const pts = [];
     let n = 0;
@@ -786,7 +786,7 @@
     const set = (lat, lng) => {
       form.lat.value = lat.toFixed(6); form.lng.value = lng.toFixed(6);
       if (mk) mk.setLatLng([lat, lng]);
-      else mk = L.marker([lat, lng], { draggable: true, icon: pin('●', '#c2410c', true) }).addTo(m).on('dragend', e => { const p = e.target.getLatLng(); set(p.lat, p.lng); });
+      else mk = L.marker([lat, lng], { draggable: true, icon: pin('●', '#0e6b73', true) }).addTo(m).on('dragend', e => { const p = e.target.getLatLng(); set(p.lat, p.lng); });
     };
     m.on('click', e => set(e.latlng.lat, e.latlng.lng));
     if (start) { set(start[0], start[1]); m.setView(start, 15); }

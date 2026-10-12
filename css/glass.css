@@ -1,70 +1,71 @@
 /*
- * 선셋 테마. style.css 위에 덮어쓴다.
- * 콘텐츠(카드, 입력 칸)는 크림색 종이 위의 불투명한 면으로 두고,
+ * 딥 틸 + 퍼플 테마. style.css 위에 덮어쓴다.
+ * 콘텐츠(카드, 입력 칸)는 옅은 배경 위의 반투명 면으로 두고,
  * 화면에 떠 있는 것(탭바, 지도 위 검색·버튼, 토스트, 시트)만 반투명 유리로 만든다.
  * 투명도 줄이기 설정이나 backdrop-filter 미지원 브라우저에서는 유리도 불투명한 면으로 돌아간다.
  */
 :root {
-  --bg: #fbf4ec;
+  --bg: #f2f5f5;
   --surface: #ffffff;
-  --surface-2: #f5eadf;
-  --text: #2a1a14;
-  --muted: #6e5a50;
-  --line: #eadfd2;
-  --field-line: #e3d6c6;
-  --accent: #c2410c;
+  --surface-2: #e7eeee;
+  --text: #142326;
+  --muted: #56676a;
+  --line: #dce5e5;
+  --field-line: #d3dede;
+  --accent: #0e6b73;
   --accent-ink: #ffffff;
-  --accent-soft: #ffe2cc;
-  --point: #f7b538;
-  --point-ink: #3b2300;
-  --warn: #9a3412;
+  --accent-soft: #d5ecec;
+  --point: #6b3fa0;
+  --point-ink: #ffffff;
+  --warn: #b42318;
   --radius: 20px;
-  --shadow: 0 1px 2px rgba(42, 26, 20, .05), 0 6px 18px rgba(42, 26, 20, .05);
+  --shadow: 0 1px 2px rgba(20, 35, 38, .05), 0 6px 18px rgba(20, 35, 38, .05);
   /* 면 투명도 30%: 카드·사이드바·탭바·시트 모두 70% 불투명 유리 */
-  --glass: rgba(255, 252, 248, .7);
-  --accent-glass: linear-gradient(135deg, rgba(194, 65, 12, .7), rgba(124, 45, 18, .7));
-  --wash-1: rgba(251, 146, 60, .38);
-  --wash-2: rgba(247, 181, 56, .30);
-  --wash-3: rgba(225, 29, 72, .16);
+  --glass: rgba(250, 252, 252, .7);
+  --accent-glass: linear-gradient(135deg, rgba(14, 107, 115, .7), rgba(76, 45, 120, .7));
+  --wash-1: rgba(14, 107, 115, .22);
+  --wash-2: rgba(107, 63, 160, .18);
+  --wash-3: rgba(45, 180, 190, .18);
   --glass-line: rgba(255, 255, 255, .8);
   --glass-blur: blur(22px) saturate(180%);
   --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .95);
-  --glass-shadow: 0 10px 30px rgba(42, 26, 20, .16);
-  --map-land: #f3eadf;
-  --map-water: #d2dee6;
+  --glass-shadow: 0 10px 30px rgba(20, 35, 38, .16);
+  --map-land: #e9eeec;
+  --map-water: #c8dee3;
   --map-road: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #17110e;
-    --surface: #221a16;
-    --surface-2: #2d231e;
-    --text: #f6ede6;
-    --muted: #bba99e;
-    --line: #3a2e27;
-    --field-line: #4a3b33;
-    --accent: #fb8a4c;
-    --accent-ink: #2a1205;
-    --accent-soft: #4a2412;
-    --point: #f7b538;
-    --warn: #fdba74;
+    --bg: #0e1617;
+    --surface: #162123;
+    --surface-2: #1e2b2d;
+    --text: #e9f2f2;
+    --muted: #9fb2b4;
+    --line: #2a393b;
+    --field-line: #364648;
+    --accent: #4fb3bb;
+    --accent-ink: #062a2e;
+    --accent-soft: #123a3e;
+    --point: #a98be0;
+    --point-ink: #1d0f33;
+    --warn: #fda29b;
     --shadow: 0 1px 2px rgba(0, 0, 0, .35);
-    --glass: rgba(34, 26, 22, .7);
-    --accent-glass: linear-gradient(135deg, rgba(194, 65, 12, .7), rgba(124, 45, 18, .7));
-    --wash-1: rgba(194, 65, 12, .30);
-    --wash-2: rgba(161, 98, 7, .20);
-    --wash-3: rgba(190, 24, 93, .16);
+    --glass: rgba(22, 33, 35, .7);
+    --accent-glass: linear-gradient(135deg, rgba(14, 107, 115, .7), rgba(76, 45, 120, .7));
+    --wash-1: rgba(14, 107, 115, .30);
+    --wash-2: rgba(107, 63, 160, .24);
+    --wash-3: rgba(45, 120, 190, .14);
     --glass-line: rgba(255, 255, 255, .12);
     --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .12);
     --glass-shadow: 0 10px 30px rgba(0, 0, 0, .45);
-    --map-land: #2a211c;
-    --map-water: #1f2a31;
-    --map-road: #3a2e27;
+    --map-land: #1a2527;
+    --map-water: #1a2d36;
+    --map-road: #2a393b;
   }
 }
 
 body { background: var(--bg); }
-/* 유리 뒤에 비칠 노을빛 배경: 화면에 고정 */
+/* 유리 뒤에 비칠 틸·퍼플 빛 배경: 화면에 고정 */
 body::before {
   content: ""; position: fixed; inset: -10vmax; z-index: -1; pointer-events: none;
   background:
@@ -117,18 +118,20 @@ body::before {
 .btn, .btn.sm { border-radius: 999px; transition: transform .12s, filter .2s; }
 .btn:active { transform: scale(.97); }
 .btn.light { color: var(--accent); }
-@media (prefers-color-scheme: dark) { .btn.light { background: #fff; color: #c2410c; } }
+@media (prefers-color-scheme: dark) { .btn.light { background: #fff; color: #0e6b73; } }
 .seg { border-radius: 999px; }
 .seg a { border-radius: 999px; }
 .chip-btn.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
 /* 홈 소개, 여행 중 배너: 주 색 면 */
-.intro { background: var(--accent-glass); color: #fff; border: 1px solid rgba(255, 255, 255, .25); text-shadow: 0 1px 2px rgba(60, 20, 5, .35); }
+.intro { background: var(--accent-glass); color: #fff; border: 1px solid rgba(255, 255, 255, .25); text-shadow: 0 1px 2px rgba(5, 30, 35, .35); }
 .intro .muted, .intro p { color: rgba(255, 255, 255, .92); }
-.intro .btn:not(.ghost) { background: #fff; color: #c2410c; text-shadow: none; }
+.intro .btn:not(.ghost) { background: #fff; color: #0e6b73; text-shadow: none; }
 .intro .btn.ghost { color: #fff; border-color: rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .08); }
 .trip-banner { background: var(--accent-glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); color: #fff; border-radius: var(--radius); }
 .dot-live { background: var(--point); }
+.fork-line { color: var(--point); }
+.badge-new { color: var(--point); background: color-mix(in srgb, var(--point) 14%, transparent); }
 
 /* 사진 없는 가이드 커버: 그 가이드의 루트를 지도처럼 그린다 */
 .route-cover { position: relative; display: block; width: 100%; aspect-ratio: 16 / 10; background: var(--map-land); overflow: hidden; }
@@ -161,20 +164,20 @@ body::before {
 .stops::before { background: repeating-linear-gradient(color-mix(in srgb, var(--accent) 45%, transparent) 0 6px, transparent 6px 12px); }
 
 /* 모달: 아래에서 올라오는 유리 시트 */
-.modal-back { background: rgba(42, 26, 20, .3); }
+.modal-back { background: rgba(20, 35, 38, .3); }
 .modal-back { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .modal-card { border-radius: 28px 28px 0 0; }
 @media (min-width: 600px) { .modal-card { border-radius: 28px; } }
 
 /* 접근성·호환: 투명도 줄이기, backdrop-filter 미지원 */
 @media (prefers-reduced-transparency: reduce) {
-  :root { --glass: #ffffff; --accent-glass: #c2410c; }
+  :root { --glass: #ffffff; --accent-glass: #0e6b73; }
   body::before { display: none; }
 }
 @media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
-  :root { --glass: #221a16; }
+  :root { --glass: #162123; }
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :root { --glass: rgba(255, 255, 255, .95); }
-  @media (prefers-color-scheme: dark) { :root { --glass: rgba(34, 26, 22, .96); } }
+  @media (prefers-color-scheme: dark) { :root { --glass: rgba(22, 33, 35, .96); } }
 }
