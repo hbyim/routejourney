@@ -1,0 +1,18 @@
+# 포스팅의 사진 주소와 실제로 열리는지(HTTP 상태)를 읽기만 해서 점검합니다. Actions 탭에서 수동 실행.
+name: Check photos
+on: workflow_dispatch
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          exec > >(tee /tmp/out) 2>&1
+          U=$(grep -oP "supabaseUrl:\s*'\K[^']+" js/config.js | sed 's#/$##')
+          K=$(grep -oP "supabaseAnonKey:\s*'\K[^']+" js/config.js)
+          curl -s "$U/rest/v1/posts?select=id,user_id,photo_url,created_at&order=created_at.desc&limit=15" -H "apikey: $K" -H "Authorization: Bearer $K" > /tmp/p.json
+          jq -r '.[] | "\(.created_at[0:16]) \(.id[0:8]) \(.photo_url // "-")"' /tmp/p.json | while read -r d id url; do
+            if [ "$url" = "-" ]; then echo "$d $id no-photo"; else echo "$d $id $(curl -s -o /dev/null -w '%{http_code} %{content_type} %{size_download}' "$url") ${url#$U}"; fi
+          done
+          sleep 1; echo "::notice::$(sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g' /tmp/out)"
