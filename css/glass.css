@@ -20,7 +20,12 @@
   --warn: #9a3412;
   --radius: 20px;
   --shadow: 0 1px 2px rgba(42, 26, 20, .05), 0 6px 18px rgba(42, 26, 20, .05);
-  --glass: rgba(255, 255, 255, .62);
+  /* 면 투명도 30%: 카드·사이드바·탭바·시트 모두 70% 불투명 유리 */
+  --glass: rgba(255, 252, 248, .7);
+  --accent-glass: linear-gradient(135deg, rgba(194, 65, 12, .7), rgba(124, 45, 18, .7));
+  --wash-1: rgba(251, 146, 60, .38);
+  --wash-2: rgba(247, 181, 56, .30);
+  --wash-3: rgba(225, 29, 72, .16);
   --glass-line: rgba(255, 255, 255, .8);
   --glass-blur: blur(22px) saturate(180%);
   --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .95);
@@ -44,7 +49,11 @@
     --point: #f7b538;
     --warn: #fdba74;
     --shadow: 0 1px 2px rgba(0, 0, 0, .35);
-    --glass: rgba(34, 26, 22, .62);
+    --glass: rgba(34, 26, 22, .7);
+    --accent-glass: linear-gradient(135deg, rgba(194, 65, 12, .7), rgba(124, 45, 18, .7));
+    --wash-1: rgba(194, 65, 12, .30);
+    --wash-2: rgba(161, 98, 7, .20);
+    --wash-3: rgba(190, 24, 93, .16);
     --glass-line: rgba(255, 255, 255, .12);
     --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .12);
     --glass-shadow: 0 10px 30px rgba(0, 0, 0, .45);
@@ -55,9 +64,18 @@
 }
 
 body { background: var(--bg); }
+/* 유리 뒤에 비칠 노을빛 배경: 화면에 고정 */
+body::before {
+  content: ""; position: fixed; inset: -10vmax; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(40vmax 40vmax at 8% 6%, var(--wash-1), transparent 70%),
+    radial-gradient(38vmax 38vmax at 95% 22%, var(--wash-2), transparent 70%),
+    radial-gradient(36vmax 36vmax at 70% 96%, var(--wash-3), transparent 70%),
+    radial-gradient(30vmax 30vmax at 4% 80%, var(--wash-2), transparent 70%);
+}
 
-/* 떠 있는 유리 면 */
-.tabbar, .toast, .place-bar, .place-results, .modal-card, .leaflet-bar, .leaflet-control-attribution, .leaflet-popup-content-wrapper, .cover-badge {
+/* 유리 면 */
+.card, .tabbar, .toast, .place-bar, .place-results, .modal-card, .leaflet-bar, .leaflet-control-attribution, .leaflet-popup-content-wrapper, .cover-badge {
   background-color: var(--glass);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
@@ -66,8 +84,8 @@ body { background: var(--bg); }
 }
 
 /* 콘텐츠 면: 불투명한 종이 카드 */
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
-.input, select.input { background: var(--surface); border-color: var(--field-line); border-radius: 14px; }
+.card { border-radius: var(--radius); box-shadow: var(--glass-hi), var(--shadow); }
+.input, select.input { background: var(--glass); border-color: var(--field-line); border-radius: 14px; }
 .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
 .btn.ghost, .chip-btn { border-color: var(--field-line); }
 
@@ -85,7 +103,7 @@ body { background: var(--bg); }
 
 /* PC 사이드바: 크림보다 한 톤 짙은 종이 */
 @media (min-width: 768px) {
-  .sidenav { background: var(--surface-2); border-right: 1px solid var(--line); }
+  .sidenav { background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-right: 1px solid var(--glass-line); }
   .navlinks a { border-radius: 14px; transition: background .2s; }
   .navlinks a:hover { background: color-mix(in srgb, var(--surface) 70%, transparent); }
   .navlinks a.on { background: var(--surface); box-shadow: var(--shadow); }
@@ -105,11 +123,11 @@ body { background: var(--bg); }
 .chip-btn.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
 /* 홈 소개, 여행 중 배너: 주 색 면 */
-.intro { background: var(--accent); color: var(--accent-ink); border: 0; }
-.intro .muted, .intro p { color: color-mix(in srgb, var(--accent-ink) 88%, transparent); }
-.intro .btn:not(.ghost) { background: var(--accent-ink); color: var(--accent); }
-.intro .btn.ghost { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); background: transparent; }
-.trip-banner { background: var(--accent); color: var(--accent-ink); border-radius: var(--radius); }
+.intro { background: var(--accent-glass); color: #fff; border: 1px solid rgba(255, 255, 255, .25); text-shadow: 0 1px 2px rgba(60, 20, 5, .35); }
+.intro .muted, .intro p { color: rgba(255, 255, 255, .92); }
+.intro .btn:not(.ghost) { background: #fff; color: #c2410c; text-shadow: none; }
+.intro .btn.ghost { color: #fff; border-color: rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .08); }
+.trip-banner { background: var(--accent-glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); color: #fff; border-radius: var(--radius); }
 .dot-live { background: var(--point); }
 
 /* 사진 없는 가이드 커버: 그 가이드의 루트를 지도처럼 그린다 */
@@ -144,13 +162,14 @@ body { background: var(--bg); }
 
 /* 모달: 아래에서 올라오는 유리 시트 */
 .modal-back { background: rgba(42, 26, 20, .3); }
-.modal-card { --glass: rgba(255, 255, 255, .82); border-radius: 28px 28px 0 0; }
-@media (prefers-color-scheme: dark) { .modal-card { --glass: rgba(34, 26, 22, .88); } }
+.modal-back { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.modal-card { border-radius: 28px 28px 0 0; }
 @media (min-width: 600px) { .modal-card { border-radius: 28px; } }
 
 /* 접근성·호환: 투명도 줄이기, backdrop-filter 미지원 */
 @media (prefers-reduced-transparency: reduce) {
-  :root { --glass: #ffffff; }
+  :root { --glass: #ffffff; --accent-glass: #c2410c; }
+  body::before { display: none; }
 }
 @media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
   :root { --glass: #221a16; }

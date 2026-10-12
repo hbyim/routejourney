@@ -5,6 +5,8 @@
   const CHUNK = 100;
   const chunks = (arr, n = CHUNK) => { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; };
   const uniq = arr => Array.from(new Set(arr.filter(Boolean)));
+  // 공개 사진 주소에서 photos 버킷 안의 경로만 꺼낸다 (?v= 같은 뒷부분은 뺀다)
+  const photoPath = url => { const m = /\/object\/public\/photos\/([^?#]+)/.exec(url || ''); return m ? decodeURIComponent(m[1]) : null; };
 
   function create(cfg) {
     if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase) return null;
@@ -189,9 +191,9 @@
         await del.then(ok);
       }),
       deleteGuide: id => q(() => sb.from('guides').delete().eq('id', id).then(ok)),
-      async uploadPhoto(postId, dataUrl) {
+      async uploadPhoto(postId, dataUrl, name = postId) {
         const blob = await (await fetch(dataUrl)).blob();
-        const path = `${api.user.id}/${postId}.jpg`;
+        const path = `${api.user.id}/${name}.jpg`;
         // 포스팅마다 새 경로라 덮어쓰기(upsert)가 필요 없다. upsert는 저장소 UPDATE 권한까지 요구하는데 photos 버킷에는 그 정책이 없어 업로드가 거부됐다.
         await sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' }).then(ok);
         return sb.storage.from('photos').getPublicUrl(path).data.publicUrl;
@@ -209,22 +211,21 @@
         } else ok(res);
         return url;
       }),
-      // 사진을 바꾸면 같은 경로의 예전 파일을 지우고 새로 올린다 (덮어쓰기 권한이 없어서).
-      // 주소 뒤에 버전을 붙여 브라우저·CDN에 남은 예전 사진 대신 새 사진이 보이게 한다.
-      updatePost: (p, photoDataUrl) => q(async () => {
+      // 사진을 바꾸면 새 파일 이름으로 먼저 올리고, 포스팅이 새 주소를 가리킨 뒤에 예전 파일을 지운다.
+      // 덮어쓰기 권한이 없고, 중간에 실패해도 포스팅이 없는 파일을 가리키지 않게 하기 위해서다.
+      updatePost: (p, photoDataUrl, oldPhotoUrl) => q(async () => {
         let url = null;
-        if (photoDataUrl) {
-          await sb.storage.from('photos').remove([`${api.user.id}/${p.id}.jpg`]);
-          url = (await api.uploadPhoto(p.id, photoDataUrl)) + '?v=' + Date.now();
-        }
+        if (photoDataUrl) url = await api.uploadPhoto(p.id, photoDataUrl, `${p.id}-${Date.now().toString(36)}`);
         const row = { spot_id: p.spotId, at: p.at, text: p.text, rating: p.rating, cost: p.cost, currency: p.currency || 'JPY', tags: p.tags };
         if (url) row.photo_url = url;
         await sb.from('posts').update(row).eq('id', p.id).eq('user_id', api.user.id).then(ok);
+        const old = url && photoPath(oldPhotoUrl);
+        if (old) await sb.storage.from('photos').remove([old]);
         return url;
       }),
-      deletePost: id => q(async () => {
+      deletePost: (id, photoUrl) => q(async () => {
         await sb.from('posts').delete().eq('id', id).then(ok);
-        await sb.storage.from('photos').remove([`${api.user.id}/${id}.jpg`]);
+        await sb.storage.from('photos').remove(uniq([`${api.user.id}/${id}.jpg`, photoPath(photoUrl)].filter(Boolean)));
       }),
 
       /* ---------- 계정 ---------- */

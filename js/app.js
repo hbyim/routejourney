@@ -1259,10 +1259,11 @@
       case 'delete-post': {
         closeModal();
         if (!(await confirmModal('포스팅을 삭제할까요?', '사진과 기록이 지워지고, 이 포스팅이 들어간 가이드에는 스팟만 남아요.', '삭제', true))) break;
+        const photoUrl = db.posts[id] && db.posts[id].photo;
         delete db.posts[id];
         guidesArr().forEach(g => g.items.forEach(i => { if (i.postId === id) i.postId = null; }));
         save(); route(true); toast('삭제했어요.');
-        if (cloud) quiet(push(cloud.deletePost(id)));
+        if (cloud) quiet(push(cloud.deletePost(id, photoUrl)));
         break;
       }
       case 'block': {
@@ -1557,7 +1558,7 @@
       if (cloud) {
         try {
           if (r.created) await push(cloud.addSpot(s));
-          const url = await push(cloud.updatePost(p, photo));
+          const url = await push(cloud.updatePost(p, photo, before.photo));
           if (url) p.photo = url;
           for (const g of touched) await syncGuide(g);
         } catch (err) {
