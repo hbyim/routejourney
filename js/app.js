@@ -41,7 +41,9 @@
     if (!p || !p.then) return p;
     return p.catch(err => {
       console.error(err);
-      toast(navigator.onLine === false ? '오프라인이에요. 연결되면 다시 시도해주세요.' : err && err.userMessage || '서버에 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
+      // 원인을 알 수 있게 서버가 돌려준 코드와 메시지 앞부분을 함께 보여준다
+      const detail = err && [err.code || err.statusCode, err.message].filter(Boolean).join(' ').slice(0, 90);
+      toast(navigator.onLine === false ? '오프라인이에요. 연결되면 다시 시도해주세요.' : err && err.userMessage || `서버에 저장하지 못했어요.${detail ? ` (${detail})` : ' 잠시 후 다시 시도해주세요.'}`);
       throw err;
     });
   }
