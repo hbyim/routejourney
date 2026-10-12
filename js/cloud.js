@@ -192,7 +192,8 @@
       async uploadPhoto(postId, dataUrl) {
         const blob = await (await fetch(dataUrl)).blob();
         const path = `${api.user.id}/${postId}.jpg`;
-        await sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true, cacheControl: '31536000' }).then(ok);
+        // 포스팅마다 새 경로라 덮어쓰기(upsert)가 필요 없다. upsert는 저장소 UPDATE 권한까지 요구하는데 photos 버킷에는 그 정책이 없어 업로드가 거부됐다.
+        await sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' }).then(ok);
         return sb.storage.from('photos').getPublicUrl(path).data.publicUrl;
       },
       createPost: (p, photoDataUrl) => q(async () => {
