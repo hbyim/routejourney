@@ -15,4 +15,21 @@ jobs:
           jq -r '.[] | "\(.created_at[0:16]) \(.id[0:8]) \(.photo_url // "-")"' /tmp/p.json | while read -r d id url; do
             if [ "$url" = "-" ]; then echo "$d $id no-photo"; else echo "$d $id $(curl -s -o /dev/null -w '%{http_code} %{content_type} %{size_download}' "$url") ${url#$U}"; fi
           done
+          echo "== 배포 사이트에서 사진 표시"
+          npm i -s playwright@1.48.2 >/dev/null 2>&1 && npx -y playwright@1.48.2 install --with-deps chromium >/dev/null 2>&1
+          cat > s.js <<'JS'
+          const { chromium } = require('playwright');
+          (async () => {
+            const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 390, height: 844 } });
+            p.on('console', m => { if (m.type() === 'error') console.log('console', m.text().slice(0, 200)); });
+            p.on('requestfailed', r => console.log('reqfail', r.url().slice(0, 120), r.failure().errorText));
+            p.on('response', r => { if (/storage\/v1/.test(r.url())) console.log('img', r.status(), r.url().slice(-60)); });
+            await p.goto('https://hbyim.github.io/routejourney/?v=' + Date.now() + '#/', { waitUntil: 'networkidle' }); await p.waitForTimeout(2500);
+            await p.evaluate(() => window.scrollTo(0, 99999)); await p.waitForTimeout(1500);
+            console.log(JSON.stringify(await p.$$eval('#app img', xs => xs.map(i => [i.className, i.naturalWidth, i.getAttribute('src').slice(-50)]))));
+            console.log('ph', await p.$$eval('#app .photo.ph', xs => xs.length), 'route', await p.$$eval('#app .route-cover', xs => xs.length));
+            await b.close();
+          })();
+          JS
+          node s.js
           sleep 1; echo "::notice::$(sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g' /tmp/out)"
