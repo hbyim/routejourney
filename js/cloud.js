@@ -25,6 +25,12 @@
     const toUser = r => ({ id: r.id, name: r.name, bio: r.bio || '', color: r.color, activeTripId: r.active_trip_id, termsAgreedAt: r.terms_agreed_at, locationAgreedAt: r.location_agreed_at, marketing: r.marketing_agreed });
     const toSpot = r => ({ id: r.id, name: r.name, cat: r.cat, lat: r.lat, lng: r.lng, area: r.area || '' });
     const toPost = r => ({ id: r.id, userId: r.user_id, spotId: r.spot_id, at: r.at, text: r.text || '', rating: r.rating, cost: r.cost || 0, currency: r.currency || 'JPY', tags: r.tags || [], photo: r.photo_url, hidden: r.hidden });
+    const toComment = r => ({ id: r.id, postId: r.post_id, userId: r.user_id, body: r.body, at: r.created_at, hidden: r.hidden });
+    // 덧글 테이블을 아직 안 만들었으면(서버 SQL 미실행) 알아들을 수 있는 말로 바꾼다
+    const noTable = err => {
+      if (err && (err.code === 'PGRST205' || err.code === '42P01')) err.userMessage = '덧글 기능은 서버 설정(SQL 실행)을 마치면 쓸 수 있어요.';
+      throw err;
+    };
     const toGuide = (r, likes, saves) => ({
       id: r.id, ownerId: r.owner_id, title: r.title, city: r.city || '', desc: r.descr || '', startDate: r.start_date,
       forkedFrom: r.forked_from, forkedFromTitle: r.forked_from_title, tags: r.tags || [], visibility: r.visibility,
@@ -143,6 +149,13 @@
         await api.fillRefs(db);
         return db.spots[id];
       },
+      async listComments(db, postId) {
+        const rows = await sb.from('comments').select('*').eq('post_id', postId).order('created_at').limit(300).then(ok).catch(noTable);
+        Object.keys(db.comments).forEach(k => { if (db.comments[k].postId === postId) delete db.comments[k]; });
+        rows.forEach(r => { db.comments[r.id] = toComment(r); });
+        const ids = uniq(rows.map(r => r.user_id)).filter(id => !db.users[id]);
+        if (ids.length) (await sb.from('profiles').select('id,name,bio,color').in('id', ids).then(ok)).forEach(r => { db.users[r.id] = toUser(r); });
+      },
       async search(db, text) {
         const k = text.replace(/[%,()]/g, ' ').trim();
         if (!k) return;
@@ -179,6 +192,8 @@
         return sb.from('guide_progress').upsert({ user_id: api.user.id, guide_id: gid, following: !!prog.__on, done, updated_at: new Date().toISOString() }, { onConflict: 'user_id,guide_id' }).then(ok);
       }),
       report: (type, id, reason) => q(() => sb.from('reports').upsert({ reporter_id: api.user.id, target_type: type, target_id: id, reason }, { onConflict: 'reporter_id,target_type,target_id', ignoreDuplicates: true }).then(ok)),
+      addComment: c => q(() => sb.from('comments').insert({ id: c.id, post_id: c.postId, user_id: api.user.id, body: c.body }).then(ok).catch(noTable)),
+      deleteComment: id => q(() => sb.from('comments').delete().eq('id', id).then(ok)),
       updateProfile: fields => q(() => sb.from('profiles').update(fields).eq('id', api.user.id).then(ok)),
       addSpot: s => q(() => sb.from('spots').upsert({ id: s.id, name: s.name, cat: s.cat, lat: s.lat, lng: s.lng, area: s.area || '', created_by: api.user.id }, { onConflict: 'id', ignoreDuplicates: true }).then(ok)),
       // 가이드 정보와 항목 목록을 화면 상태 그대로 맞춘다

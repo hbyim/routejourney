@@ -112,13 +112,27 @@ create table if not exists public.blocks (
 create table if not exists public.reports (
   id uuid primary key default gen_random_uuid(),
   reporter_id uuid not null references public.profiles (id) on delete cascade,
-  target_type text not null check (target_type in ('post', 'guide', 'user')),
+  target_type text not null check (target_type in ('post', 'guide', 'user', 'comment')),
   target_id uuid not null,
   reason text not null check (char_length(reason) between 1 and 300),
   status text not null default 'open' check (status in ('open', 'resolved', 'rejected')),
   created_at timestamptz not null default now(),
   unique (reporter_id, target_type, target_id)
 );
+
+-- 사진(포스팅) 덧글
+create table if not exists public.comments (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.posts (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 300),
+  hidden boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists comments_post_idx on public.comments (post_id, created_at);
+-- 이미 만든 DB에서 덧글도 신고할 수 있게 한다
+alter table public.reports drop constraint if exists reports_target_type_check;
+alter table public.reports add constraint reports_target_type_check check (target_type in ('post', 'guide', 'user', 'comment'));
 
 -- 이미 만든 DB에 쓴 돈 통화 열을 더한다 (원·엔은 그대로, 달러·위안은 1/100 단위로 cost에 저장)
 alter table public.posts add column if not exists currency text not null default 'JPY' check (currency in ('KRW', 'JPY', 'USD', 'CNY'));
@@ -200,6 +214,14 @@ end $$;
 drop trigger if exists posts_protect on public.posts;
 create trigger posts_protect before insert or update on public.posts for each row execute function public.protect_post_columns();
 
+create or replace function public.protect_comment_columns() returns trigger language plpgsql as $$
+begin
+  if current_user in ('authenticated', 'anon') then new.hidden := false; new.created_at := now(); end if;
+  return new;
+end $$;
+drop trigger if exists comments_protect on public.comments;
+create trigger comments_protect before insert on public.comments for each row execute function public.protect_comment_columns();
+
 -- 서로 다른 사용자 3명 이상이 신고하면 자동 숨김 (관리자가 대시보드에서 hidden=false 로 복구)
 create or replace function public.auto_hide_reported() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -210,6 +232,7 @@ begin
   if n >= 3 then
     if new.target_type = 'post' then update public.posts set hidden = true where id = new.target_id;
     elsif new.target_type = 'guide' then update public.guides set hidden = true where id = new.target_id;
+    elsif new.target_type = 'comment' then update public.comments set hidden = true where id = new.target_id;
     end if;
   end if;
   return null;
@@ -240,6 +263,7 @@ alter table public.follows enable row level security;
 alter table public.guide_progress enable row level security;
 alter table public.blocks enable row level security;
 alter table public.reports enable row level security;
+alter table public.comments enable row level security;
 
 create or replace function public.can_read_guide(gid uuid) returns boolean
 language sql stable security definer set search_path = public as $$
@@ -304,6 +328,16 @@ create policy follows_write on public.follows for insert to authenticated with c
 drop policy if exists follows_delete on public.follows;
 create policy follows_delete on public.follows for delete to authenticated using (follower_id = auth.uid());
 
+-- 덧글: 볼 수 있는 포스팅의 덧글만 읽고, 내 이름으로만 달고, 내 덧글이나 내 포스팅의 덧글만 지운다
+drop policy if exists comments_read on public.comments;
+create policy comments_read on public.comments for select
+  using ((not hidden or user_id = auth.uid()) and exists (select 1 from public.posts p where p.id = post_id));
+drop policy if exists comments_insert on public.comments;
+create policy comments_insert on public.comments for insert to authenticated
+  with check (user_id = auth.uid() and exists (select 1 from public.posts p where p.id = post_id and not p.hidden));
+drop policy if exists comments_delete on public.comments;
+create policy comments_delete on public.comments for delete to authenticated
+  using (user_id = auth.uid() or exists (select 1 from public.posts p where p.id = post_id and p.user_id = auth.uid()));
 drop policy if exists reports_insert on public.reports;
 create policy reports_insert on public.reports for insert to authenticated with check (reporter_id = auth.uid());
 

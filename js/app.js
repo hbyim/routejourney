@@ -21,7 +21,7 @@
    * 서버 모드: config.js 에 Supabase 키가 있으면 cloud.js 가 서버에서 읽고 쓴다. db 는 화면용 캐시다. */
   let cloud = null;
   let db = null;
-  const emptyDb = () => ({ version: 1, me: null, users: {}, spots: {}, posts: {}, guides: {}, likes: {}, saves: {}, follows: {}, progress: {}, blocks: {}, activeTripId: null, seq: 100 });
+  const emptyDb = () => ({ version: 1, me: null, users: {}, spots: {}, posts: {}, comments: {}, guides: {}, likes: {}, saves: {}, follows: {}, progress: {}, blocks: {}, activeTripId: null, seq: 100 });
   function loadLocal() {
     try {
       const raw = localStorage.getItem(DB_KEY);
@@ -148,8 +148,12 @@
     const c = CATS[cat] || CATS.etc;
     return `<span class="chip" style="--chip:${c.color}">${c.label}</span>`;
   }
-  function photoBox(post, spot, cls = '') {
-    if (post && post.photo) return `<img class="photo ${cls}" src="${esc(post.photo)}" alt="${esc(spot.name)} 사진" loading="lazy">`;
+  // zoom: 누르면 사진을 크게 보고 덧글을 다는 창이 열린다
+  function photoBox(post, spot, cls = '', zoom = false) {
+    if (post && post.photo) {
+      const img = `<img class="photo ${cls}" src="${esc(post.photo)}" alt="${esc(spot.name)} 사진" loading="lazy">`;
+      return zoom ? `<button type="button" class="photo-btn ${cls}" data-act="view-photo" data-id="${esc(post.id)}" aria-label="${esc(spot.name)} 사진 크게 보기">${img}</button>` : img;
+    }
     const c = CATS[spot.cat] || CATS.etc;
     return `<div class="photo ph ${cls}" style="--ph:${c.color}" role="img" aria-label="${esc(spot.name)}"><span>${esc(spot.name)}</span></div>`;
   }
@@ -429,12 +433,12 @@
     return `<article class="card post-card">
       <header class="post-head"><a class="who" href="#/user/${esc(u.id)}">${avatar(u, 32)}<span><b>${esc(u.name)}</b><small class="muted">${ago(p.at)}</small></span></a>
         <button class="btn sm ghost more" data-act="post-menu" data-id="${esc(p.id)}" aria-label="더보기">⋯</button></header>
-      ${photoBox(p, s)}
+      ${photoBox(p, s, '', true)}
       <div class="card-body">
         <a href="#/spot/${esc(s.id)}" class="spot-line">${catChip(s.cat)}<b>${esc(s.name)}</b><span class="muted">${esc(s.area || '')}</span></a>
         ${mine && p.hidden ? '<p class="warn small">신고 누적으로 숨김 처리된 포스팅이에요.</p>' : ''}
         <p>${esc(p.text)}</p>
-        <div class="meta-row">${stars(p.rating)}<span class="muted">${money(p.cost, p.currency)}</span></div>
+        <div class="meta-row">${stars(p.rating)}<span class="muted">${money(p.cost, p.currency)}</span>${cmtLink(p)}</div>
         ${inGuides.length ? `<p class="small muted">수록 가이드: ${inGuides.slice(0, 2).map(g => `<a href="#/guide/${esc(g.id)}">${esc(g.title)}</a>`).join(', ')}${inGuides.length > 2 ? ` 외 ${inGuides.length - 2}개` : ''}</p>` : ''}
       </div>
     </article>`;
@@ -583,9 +587,9 @@
                   ${added.has(it.id) ? '<span class="badge-new">포크에서 추가</span>' : ''}
                   ${following ? `<label class="check"><input type="checkbox" data-act="done" data-g="${esc(g.id)}" data-i="${esc(it.id)}" ${done ? 'checked' : ''}> 방문</label>` : ''}
                 </div>
-                ${p ? `<div class="stop-post">${photoBox(p, s, 'thumb')}<div>
+                ${p ? `<div class="stop-post">${photoBox(p, s, 'thumb', true)}<div>
                   <p>${esc(p.text)}</p>
-                  <p class="small muted">${stars(p.rating)} ${money(p.cost, p.currency)} · ${fmtTime(p.at)}${by && by.id !== g.ownerId ? ` · ${esc(by.name)}님의 기록` : ''}${p.userId === db.me ? ` · <a href="#/post/${esc(p.id)}/edit">수정</a>` : ''}</p>
+                  <p class="small muted">${stars(p.rating)} ${money(p.cost, p.currency)} · ${fmtTime(p.at)}${by && by.id !== g.ownerId ? ` · ${esc(by.name)}님의 기록` : ''}${p.userId === db.me ? ` · <a href="#/post/${esc(p.id)}/edit">수정</a>` : ''} · ${cmtLink(p)}</p>
                 </div></div>` : ''}
                 ${it.note ? `<p class="note">메모: ${esc(it.note)}</p>` : ''}
               </div>
@@ -1087,12 +1091,70 @@
 
   function notFound() { return '<div class="card pad center"><h2>찾을 수 없어요</h2><p class="muted">삭제됐거나 공개 범위가 바뀐 페이지일 수 있어요.</p><a class="btn" href="#/">홈으로</a></div>'; }
 
+  /* ---------- 사진 크게 보기 + 덧글 ---------- */
+  const commentsLoaded = new Set();
+  const commentsOf = pid => Object.values(db.comments).filter(c => c.postId === pid && (c.userId === db.me || (!c.hidden && !db.blocks[c.userId]))).sort((a, b) => new Date(a.at) - new Date(b.at));
+  // 서버 모드에서는 덧글을 불러오기 전에는 개수를 모르니 숫자를 빼고 보여준다
+  function cmtLabel(p) {
+    const n = commentsOf(p.id).length;
+    return n && (!cloud || commentsLoaded.has(p.id)) ? `덧글 ${n}` : '덧글';
+  }
+  const cmtLink = p => `<button type="button" class="linkish cmt-link" data-act="view-photo" data-id="${esc(p.id)}" data-cmt="${esc(p.id)}">${cmtLabel(p)}</button>`;
+  function commentList(p) {
+    const list = commentsOf(p.id);
+    if (!list.length) return `<li class="muted small">${cloud && !commentsLoaded.has(p.id) ? '불러오는 중…' : '첫 덧글을 남겨보세요.'}</li>`;
+    return list.map(c => {
+      const u = userOf(c.userId);
+      const canDelete = c.userId === db.me || p.userId === db.me;
+      return `<li class="cmt">${avatar(u, 28)}<div>
+        <p><b>${esc(u.name)}</b> <small class="muted">${ago(c.at)}</small></p>
+        <p class="cmt-body">${esc(c.body)}</p>
+        <p class="cmt-acts">${canDelete ? `<button type="button" class="linkish" data-act="delete-comment" data-id="${esc(c.id)}">삭제</button>` : ''}${db.me && c.userId !== db.me ? `<button type="button" class="linkish" data-act="report" data-type="comment" data-id="${esc(c.id)}">신고</button>` : ''}</p>
+      </div></li>`;
+    }).join('');
+  }
+  function refreshComments(pid) {
+    const p = db.posts[pid];
+    if (!p) return;
+    document.querySelectorAll(`[data-cmt="${CSS.escape(pid)}"]`).forEach(el => { el.textContent = cmtLabel(p); });
+    const f = $('#modal .cmt-form');
+    if (!f || f.dataset.id !== pid) return;
+    $('#cmtList').innerHTML = commentList(p);
+    $('#cmtHead').textContent = cmtLabel(p);
+  }
+  function openViewer(id) {
+    const p = db.posts[id], s = p && db.spots[p.spotId];
+    if (!s) return;
+    const u = userOf(p.userId);
+    openModal(`<div class="viewer">
+      <button type="button" class="viewer-close" data-close aria-label="닫기">✕</button>
+      <figure class="viewer-photo">${p.photo ? `<img src="${esc(p.photo)}" alt="${esc(s.name)} 사진">` : photoBox(p, s)}</figure>
+      <div class="viewer-side">
+        <div class="who">${avatar(u, 32)}<span><b>${esc(u.name)}</b><small class="muted">${esc(s.name)} · ${ago(p.at)}</small></span></div>
+        ${p.text ? `<p class="viewer-text">${esc(p.text)}</p>` : ''}
+        <h3 id="cmtHead">${cmtLabel(p)}</h3>
+        <ul class="cmts" id="cmtList">${commentList(p)}</ul>
+        <form class="cmt-form" data-form="comment" data-id="${esc(id)}">
+          <input class="input" name="body" maxlength="300" autocomplete="off" required placeholder="${db.me ? '덧글 달기' : '로그인하고 덧글 달기'}" aria-label="덧글">
+          <button class="btn sm">등록</button>
+        </form>
+      </div>
+    </div>`, 'viewer-card');
+    if (cloud && !commentsLoaded.has(id)) {
+      cloud.listComments(db, id).then(() => { commentsLoaded.add(id); refreshComments(id); }).catch(err => {
+        console.error(err);
+        const l = $('#modal #cmtList');
+        if (l && $('#modal .cmt-form').dataset.id === id) l.innerHTML = `<li class="muted small">${esc(err.userMessage || '덧글을 불러오지 못했어요.')}</li>`;
+      });
+    }
+  }
+
   /* ---------- 모달 ---------- */
   let lastFocus = null;
-  function openModal(html) {
+  function openModal(html, cls = '') {
     const m = $('#modal');
     lastFocus = document.activeElement;
-    m.innerHTML = `<div class="modal-back" data-close></div><div class="modal-card" role="dialog" aria-modal="true">${html}</div>`;
+    m.innerHTML = `<div class="modal-back" data-close></div><div class="modal-card ${cls}" role="dialog" aria-modal="true">${html}</div>`;
     m.hidden = false;
     document.body.classList.add('no-scroll');
     const f = m.querySelector('input:not([type=hidden]), select, textarea, button');
@@ -1251,6 +1313,15 @@
           <button class="btn ghost block" data-close>닫기</button></div>`);
         break;
       }
+      case 'view-photo': openViewer(id); break;
+      case 'delete-comment': {
+        const c = db.comments[id];
+        if (!c) break;
+        delete db.comments[id]; save(); refreshComments(c.postId);
+        toast('덧글을 삭제했어요.');
+        if (cloud) push(cloud.deleteComment(id)).catch(() => { db.comments[id] = c; refreshComments(c.postId); });
+        break;
+      }
       case 'edit-post': {
         closeModal();
         location.hash = '#/post/' + id + '/edit';
@@ -1261,6 +1332,7 @@
         if (!(await confirmModal('포스팅을 삭제할까요?', '사진과 기록이 지워지고, 이 포스팅이 들어간 가이드에는 스팟만 남아요.', '삭제', true))) break;
         const photoUrl = db.posts[id] && db.posts[id].photo;
         delete db.posts[id];
+        Object.values(db.comments).forEach(c => { if (c.postId === id) delete db.comments[c.id]; });
         guidesArr().forEach(g => g.items.forEach(i => { if (i.postId === id) i.postId = null; }));
         save(); route(true); toast('삭제했어요.');
         if (cloud) quiet(push(cloud.deletePost(id, photoUrl)));
@@ -1494,6 +1566,18 @@
         toast('가입이 완료됐어요!');
         location.hash = sessionStorageTake('routelog.next') || '#/';
       } catch (err) { busy(false); }
+    } else if (kind === 'comment') {
+      if (!requireAuth()) return;
+      const body = (v.body || '').trim().slice(0, 300);
+      if (!body) return;
+      const c = { id: uid('c'), postId: f.dataset.id, userId: db.me, body, at: new Date().toISOString() };
+      db.comments[c.id] = c;
+      if (!save()) { delete db.comments[c.id]; return; }
+      f.reset(); refreshComments(c.postId);
+      const l = $('#cmtList'); if (l) l.scrollTop = l.scrollHeight;
+      if (cloud) {
+        try { await push(cloud.addComment(c)); } catch (err) { delete db.comments[c.id]; refreshComments(c.postId); f.body.value = body; }
+      }
     } else if (kind === 'report') {
       const reason = (v.reason + (v.detail ? ': ' + v.detail.trim() : '')).slice(0, 300);
       closeModal();
