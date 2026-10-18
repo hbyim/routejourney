@@ -251,6 +251,15 @@
       async resetPassword(email) {
         return ok(await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }));
       },
+      // 메일로 받은 인증번호 확인. type: signup(가입 확인) | recovery(비밀번호 재설정)
+      async verifyEmailCode(email, token, type) {
+        const data = ok(await sb.auth.verifyOtp({ email, token, type }));
+        if (data && data.user) api.user = data.user;
+        return data;
+      },
+      async resendSignupCode(email) {
+        return ok(await sb.auth.resend({ type: 'signup', email, options: { emailRedirectTo: location.origin + location.pathname } }));
+      },
       async signInPassword(email, password) {
         return ok(await sb.auth.signInWithPassword({ email, password }));
       },

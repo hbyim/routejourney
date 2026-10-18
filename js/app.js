@@ -125,6 +125,37 @@
       <ul class="pw-rules" aria-live="polite">${pwRulesHtml('', '')}</ul>
       <label>비밀번호 확인<input class="input" type="password" name="password2" required minlength="10" maxlength="72" autocomplete="new-password"></label>`;
   }
+  // 메일 인증번호 입력 칸. type: signup | recovery
+  function codeForm(email, type) {
+    const recovery = type === 'recovery';
+    return `<form class="form flat code-form" data-form="${recovery ? 'reset-code' : 'verify'}" data-email="${esc(email)}">
+      <p><b>${esc(email)}</b>로 인증번호를 보냈어요.</p>
+      <label>인증번호<input class="input otp" name="token" required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" maxlength="10" placeholder="6자리 숫자" aria-describedby="codeHelp"></label>
+      ${recovery ? `<input type="hidden" name="email" value="${esc(email)}" data-pw-email>${pwFields('새 비밀번호')}` : ''}
+      <button class="btn big block">${recovery ? '비밀번호 바꾸기' : '인증하고 가입 완료'}</button>
+      <div class="row between small"><button type="button" class="linkish" data-act="resend-code" data-email="${esc(email)}" data-type="${type}">번호 다시 받기</button><span class="muted" data-cooldown></span></div>
+      <p class="small muted" id="codeHelp">메일이 안 보이면 스팸함을 확인해주세요. 메일의 링크를 눌러도 돼요.</p>
+    </form>`;
+  }
+  // 번호 다시 받기는 60초에 한 번
+  let codeSentAt = 0;
+  function startCooldown() {
+    codeSentAt = Date.now();
+    const tick = () => {
+      const left = 60 - Math.floor((Date.now() - codeSentAt) / 1000);
+      document.querySelectorAll('[data-cooldown]').forEach(el => { el.textContent = left > 0 ? `${left}초 후 다시 받을 수 있어요` : ''; });
+      if (left > 0) setTimeout(tick, 1000);
+    };
+    tick();
+  }
+  const codeError = err => {
+    const m = (err && (err.code || '') + ' ' + (err.message || '')) || '';
+    // 서버는 틀린 번호와 만료된 번호를 같은 오류(otp_expired)로 돌려준다
+    return /rate|limit|too many/i.test(m) ? '시도가 너무 많아요. 잠시 후 다시 시도해주세요.'
+      : /expired|invalid|token|otp/i.test(m) ? '번호가 맞지 않거나 만료됐어요. 메일의 숫자를 확인하거나 번호를 다시 받아주세요.'
+      : '확인하지 못했어요. 잠시 후 다시 시도해주세요.';
+  };
+  let codeFails = 0;
   function passwordError(err) {
     const m = (err && ((err.code || '') + ' ' + (err.message || ''))) || '';
     if (/weak|short|characters|pwned|leaked/i.test(m)) return '서버에서 비밀번호가 약하다고 판단했어요. 규칙에 맞게 더 길고 복잡하게 정해주세요.';
@@ -1548,12 +1579,22 @@
       case 'set-password':
         openSetPassword();
         break;
+      case 'resend-code': {
+        const left = 60 - Math.floor((Date.now() - codeSentAt) / 1000);
+        if (left > 0) { toast(`${left}초 후에 다시 받을 수 있어요.`); break; }
+        try {
+          if (el.dataset.type === 'recovery') await cloud.resetPassword(el.dataset.email);
+          else await cloud.resendSignupCode(el.dataset.email);
+          codeFails = 0; startCooldown(); toast('인증번호를 다시 보냈어요.');
+        } catch (err) { console.error(err); toast(codeError(err)); }
+        break;
+      }
       case 'forgot-password': {
         const em = ($('form[data-form=login] input[name=email]') || {}).value || '';
         openModal(`<h2>비밀번호 재설정</h2><form class="form flat" data-form="forgot">
-          <p class="small muted">가입한 이메일로 재설정 링크를 보내요. 링크를 누르면 새 비밀번호를 정하는 창이 열려요.</p>
+          <p class="small muted">가입한 이메일로 인증번호를 보내요. 번호를 넣고 새 비밀번호를 정하면 돼요.</p>
           <label>이메일<input class="input" type="email" name="email" required autocomplete="email" value="${esc(em)}"></label>
-          <div class="row end"><button type="button" class="btn ghost" data-close>취소</button><button class="btn">링크 보내기</button></div>
+          <div class="row end"><button type="button" class="btn ghost" data-close>취소</button><button class="btn">인증번호 받기</button></div>
         </form>`);
         break;
       }
@@ -1635,7 +1676,15 @@
         console.error(err);
         busy(false);
         const m = (err.code || '') + ' ' + (err.message || '');
-        toast(/rate|limit|too many/i.test(m) ? '시도가 너무 많아요. 잠시 후 다시 시도해주세요.' : /not.?confirmed/i.test(m) ? '메일 인증이 끝나지 않은 계정이에요. 가입 확인 메일의 링크를 눌러주세요.' : '이메일 또는 비밀번호가 맞지 않아요.');
+        if (/not.?confirmed/i.test(m)) {
+          // 가입 인증을 안 끝낸 계정: 번호를 새로 보내고 입력 칸을 띄운다
+          const email = v.email.trim();
+          try { await cloud.resendSignupCode(email); } catch (e2) { console.error(e2); }
+          f.outerHTML = codeForm(email, 'signup'); startCooldown();
+          toast('메일 인증이 아직이에요. 메일로 받은 번호를 넣어주세요.');
+          return;
+        }
+        toast(/rate|limit|too many/i.test(m) ? '시도가 너무 많아요. 잠시 후 다시 시도해주세요.' : '이메일 또는 비밀번호가 맞지 않아요.');
       }
     } else if (kind === 'signup') {
       const email = v.email.trim();
@@ -1644,9 +1693,7 @@
       busy(true);
       try {
         const data = await cloud.signUp(email, v.password);
-        if (!data.session) {
-          f.outerHTML = `<div class="form flat"><p><b>${esc(email)}</b>로 가입 확인 메일을 보냈어요.</p><p class="small muted">메일의 링크를 누르면 가입이 끝나요.</p></div>`;
-        }
+        if (!data.session) { f.outerHTML = codeForm(email, 'signup'); startCooldown(); $('.code-form input[name=token]').focus(); }
         // session이 있으면 onAuth(SIGNED_IN)가 동의 화면으로 보낸다
       } catch (err) {
         console.error(err);
@@ -1665,11 +1712,32 @@
         await cloud.setPassword(v.password);
         closeModal(); toast('비밀번호를 저장했어요.'); route(true);
       } catch (err) { console.error(err); busy(false); toast(passwordError(err)); }
+    } else if (kind === 'verify' || kind === 'reset-code') {
+      const email = f.dataset.email, token = (v.token || '').replace(/\D/g, '');
+      if (codeFails >= 5 && Date.now() - codeSentAt < 60000) { toast('여러 번 틀렸어요. 잠시 후 다시 시도해주세요.'); return; }
+      if (kind === 'reset-code') {
+        if (!passwordOk(v.password, email)) { toast('비밀번호 규칙을 모두 지켜주세요.'); return; }
+        if (v.password !== v.password2) { toast('두 비밀번호가 달라요.'); return; }
+      }
+      busy(true);
+      try {
+        await cloud.verifyEmailCode(email, token, kind === 'verify' ? 'signup' : 'recovery');
+        codeFails = 0;
+        if (kind === 'reset-code') {
+          await cloud.setPassword(v.password);
+          closeModal(); toast('비밀번호를 바꿨어요.');
+        } else toast('메일 인증이 끝났어요.');
+        // 로그인되면 onAuth(SIGNED_IN)가 동의 화면이나 원래 화면으로 보낸다
+      } catch (err) {
+        console.error(err); busy(false);
+        codeFails++;
+        toast(codeError(err));
+      }
     } else if (kind === 'forgot') {
       busy(true);
       try {
         await cloud.resetPassword(v.email.trim());
-        closeModal(); toast('재설정 링크를 보냈어요. 메일함(스팸함 포함)을 확인해주세요.');
+        f.outerHTML = codeForm(v.email.trim(), 'recovery'); startCooldown();
       } catch (err) {
         console.error(err); busy(false);
         toast(/rate|limit/i.test(err.message || '') ? '잠시 후 다시 시도해주세요. 메일 요청이 너무 잦아요.' : '메일을 보내지 못했어요. 주소를 확인해주세요.');
