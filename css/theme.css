@@ -326,3 +326,7 @@ h2 { font-size: 1.12rem; letter-spacing: -.015em; }
 .code-form [data-cooldown] { font-size: .8rem; }
 /* 앱이나 홈 화면 앱에서 상태 표시줄 아래로 내용이 들어가지 않게 */
 body { padding-top: env(safe-area-inset-top, 0px); }
+/* 아이폰은 16px보다 작은 입력칸을 누르면 화면을 확대하고, 로그인한 뒤에도 확대된 채로 남는다 */
+@media (pointer: coarse) {
+  input, select, textarea, .input { font-size: max(16px, 1em) !important; }
+}
