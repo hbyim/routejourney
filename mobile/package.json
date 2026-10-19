@@ -1,0 +1,24 @@
+{
+  "name": "routelog-mobile",
+  "private": true,
+  "description": "루트로그 안드로이드·iOS 앱 (Capacitor 웹앱 컨테이너)",
+  "scripts": {
+    "copy-web": "node scripts/copy-web.mjs",
+    "sync": "npm run copy-web && cap sync",
+    "assets": "capacitor-assets generate --iconBackgroundColor '#0e6b73' --iconBackgroundColorDark '#0e6b73' --splashBackgroundColor '#f3f6f6' --splashBackgroundColorDark '#0f1e20'",
+    "android": "npm run sync && cap open android",
+    "ios": "npm run sync && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
+    "@capacitor/share": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3"
+  }
+}

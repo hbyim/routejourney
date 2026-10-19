@@ -3,6 +3,9 @@
   'use strict';
 
   const CFG = window.RL_CONFIG || {};
+  // 안드로이드·iOS 앱(Capacitor) 안에서 실행 중인지
+  const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform());
+  const NativeShare = NATIVE && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
   const DB_KEY = 'routelog.v1';
   const TOKYO = [35.6812, 139.7671];
   const CATS = {
@@ -354,13 +357,17 @@
     return JSON.parse(new TextDecoder().decode(bytes));
   }
   async function shareUrl(g) {
-    const base = location.origin + location.pathname;
+    const base = (NATIVE && CFG.publicUrl) || location.origin + location.pathname;
     return cloud ? base + '#/guide/' + g.id : base + '#/import/' + await packGuide(g);
   }
   async function shareGuide(g) {
     if (cloud && g.visibility === 'private') { toast('나만 보기 가이드예요. 편집에서 공개 범위를 바꾼 뒤 공유해주세요.'); return; }
     const url = await shareUrl(g);
     try {
+      if (NativeShare) {
+        await NativeShare.share({ title: g.title, text: `${userOf(g.ownerId).name}님의 여행가이드: ${g.title}`, url, dialogTitle: '가이드 공유' });
+        return;
+      }
       if (navigator.share && matchMedia('(pointer: coarse)').matches) {
         await navigator.share({ title: g.title, text: `${userOf(g.ownerId).name}님의 여행가이드: ${g.title}`, url });
         return;
@@ -368,7 +375,7 @@
       await navigator.clipboard.writeText(url);
       toast('공유 링크를 복사했어요. 카톡이나 DM에 붙여넣으세요.');
     } catch (e) {
-      if (e && e.name === 'AbortError') return;
+      if (e && (e.name === 'AbortError' || /cancel/i.test(e.message || ''))) return;
       openModal(`<h2>공유 링크</h2><p class="muted">아래 링크를 복사해 보내주세요.</p><textarea class="input" rows="4" readonly data-select>${esc(url)}</textarea><div class="row end"><button class="btn" data-close>닫기</button></div>`);
     }
   }
@@ -1386,6 +1393,9 @@
   document.addEventListener('click', async e => {
     const closer = e.target.closest('[data-close]');
     if (closer) { e.preventDefault(); closeModal(); return; }
+    // 앱 안에서 새 창 링크(지도 길찾기, 약관 등)는 기기 브라우저나 지도 앱으로 연다
+    const ext = NATIVE && e.target.closest('a[target=_blank]');
+    if (ext) { e.preventDefault(); if (ext.host === location.host) location.hash = ext.hash; else location.href = ext.href; return; }
     const sel = e.target.closest('[data-select]');
     if (sel) { sel.select(); return; }
     const el = e.target.closest('[data-act]');
@@ -1967,7 +1977,7 @@
     save();
     route();
   }
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  if ('serviceWorker' in navigator && location.protocol === 'https:' && !NATIVE) {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
   boot();

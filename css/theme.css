@@ -324,3 +324,5 @@ h2 { font-size: 1.12rem; letter-spacing: -.015em; }
 @media (min-width: 768px) { .main > .today { margin-top: 0; } }
 .input.otp { font-size: 1.5rem; font-weight: 700; letter-spacing: .35em; text-align: center; font-variant-numeric: tabular-nums; }
 .code-form [data-cooldown] { font-size: .8rem; }
+/* 앱이나 홈 화면 앱에서 상태 표시줄 아래로 내용이 들어가지 않게 */
+body { padding-top: env(safe-area-inset-top, 0px); }

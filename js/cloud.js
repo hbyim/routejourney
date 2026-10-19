@@ -9,6 +9,7 @@
   const photoPath = url => { const m = /\/object\/public\/photos\/([^?#]+)/.exec(url || ''); return m ? decodeURIComponent(m[1]) : null; };
 
   function create(cfg) {
+    const webBase = () => (window.Capacitor && window.Capacitor.isNativePlatform() && cfg.publicUrl) || location.origin + location.pathname;
     if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase) return null;
     const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
       // 로그인 링크를 요청한 브라우저가 아닌 곳(메일 앱 안 브라우저, 다른 기기)에서 열어도 로그인되도록 implicit 방식을 쓴다.
@@ -246,10 +247,10 @@
       /* ---------- 계정 ---------- */
       // 메일 인증 없이 바로 가입한다 (Supabase의 Confirm email 설정을 끈 경우). 켜져 있으면 session 없이 돌아온다.
       async signUp(email, password) {
-        return ok(await sb.auth.signUp({ email, password, options: { data: { has_password: true }, emailRedirectTo: location.origin + location.pathname } }));
+        return ok(await sb.auth.signUp({ email, password, options: { data: { has_password: true }, emailRedirectTo: webBase() } }));
       },
       async resetPassword(email) {
-        return ok(await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }));
+        return ok(await sb.auth.resetPasswordForEmail(email, { redirectTo: webBase() }));
       },
       // 메일로 받은 인증번호 확인. type: signup(가입 확인) | recovery(비밀번호 재설정)
       async verifyEmailCode(email, token, type) {
@@ -258,7 +259,7 @@
         return data;
       },
       async resendSignupCode(email) {
-        return ok(await sb.auth.resend({ type: 'signup', email, options: { emailRedirectTo: location.origin + location.pathname } }));
+        return ok(await sb.auth.resend({ type: 'signup', email, options: { emailRedirectTo: webBase() } }));
       },
       async signInPassword(email, password) {
         return ok(await sb.auth.signInWithPassword({ email, password }));
@@ -270,7 +271,7 @@
         return data;
       },
       async signInOAuth(provider) {
-        return ok(await sb.auth.signInWithOAuth({ provider, options: { redirectTo: location.origin + location.pathname } }));
+        return ok(await sb.auth.signInWithOAuth({ provider, options: { redirectTo: webBase() } }));
       },
       async signOut() { await sb.auth.signOut(); api.user = null; },
       async deleteAccount() {

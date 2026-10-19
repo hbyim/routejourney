@@ -1,0 +1,12 @@
+{
+  "appId": "com.mytripatoz.routelog",
+  "appName": "루트로그",
+  "webDir": "www",
+  "backgroundColor": "#f3f6f6",
+  "android": { "allowMixedContent": false },
+  "ios": { "contentInset": "never" },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 800, "launchAutoHide": true, "backgroundColor": "#f3f6f6", "showSpinner": false },
+    "StatusBar": { "overlaysWebView": true, "style": "DEFAULT" }
+  }
+}
