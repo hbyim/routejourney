@@ -507,7 +507,7 @@
           const sp = itemSpot(it), p = itemPost(it);
           return `<a href="#/guide/${esc(g.id)}">${photoBox(p, sp)}<b>${i + 1}. ${esc(sp.name)}</b><small>${(CATS[sp.cat] || CATS.etc).label}${p ? ' · ' + hhmm(p.at) : ''}</small></a>`;
         }).join('')}</div>` : '<p class="today-empty">오늘 첫 스팟을 올려보세요. 사진 한 장이면 돼요.</p>'}
-        <a class="btn big" href="#/new">지금 장소 올리기</a>
+        <div class="cta-bar row"><button class="btn ghost" data-act="end-trip">여행 마치기</button><a class="btn big" href="#/new">지금 장소 올리기</a></div>
       </div>
     </section>`;
   }
@@ -619,8 +619,10 @@
     const shareI = I('<path d="M12 4v11M8 8l4-4 4 4M5 13v6h14v-6"/>');
     const back = I('<path d="m15 5-7 7 7 7"/>');
     const dots = I('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>');
+    const traveling = mine && db.activeTripId === g.id;
     const cta = mine
-      ? `<a class="btn big" href="${db.activeTripId === g.id ? '#/new' : `#/guide/${esc(g.id)}/edit`}">${db.activeTripId === g.id ? '지금 장소 올리기' : '가이드 편집'}</a>`
+      ? (traveling ? `<button class="btn ghost" data-act="end-trip">여행 마치기</button><a class="btn big" href="#/new">지금 장소 올리기</a>`
+        : `<button class="btn big" data-act="resume-trip" data-id="${esc(g.id)}">이 여행 이어서 기록하기</button>`)
       : following
         ? (nextSpot ? `<a class="btn big" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${nextSpot.lat},${nextSpot.lng}">다음 스팟 길찾기 · ${esc(nextSpot.name)}</a>` : `<button class="btn big" data-act="fork" data-id="${esc(g.id)}">완주! 포크해서 내 기록 더하기</button>`)
         : `<button class="btn big" data-act="follow" data-id="${esc(g.id)}">이 가이드 따라가기</button>`;
@@ -694,7 +696,7 @@
       </ol>
       ${!g.items.length ? `<p class="empty">아직 스팟이 없어요. ${mine ? '<a href="#/new">첫 포스팅</a>을 올리면 여기에 쌓여요.' : ''}</p>` : ''}
 
-      <div class="cta-bar">${cta}</div>
+      <div class="cta-bar${traveling ? ' row' : ''}">${cta}</div>
 
       <section class="lineage card">
         <h2>계보</h2>
@@ -1020,7 +1022,7 @@
     const active = db.activeTripId && db.guides[db.activeTripId];
     const today = new Date().toISOString().slice(0, 10);
     return `<div class="page-head"><h1>내 여행</h1></div>
-    ${active ? tripBanner() + `<div class="row end"><button class="btn ghost" data-act="end-trip">여행 끝내기</button></div>` : `
+    ${active ? tripBanner() + `<div class="row end"><button class="btn ghost" data-act="end-trip">여행 마치기</button></div>` : `
     <form class="card form" data-form="start-trip">
       <h2>여행 시작하기</h2>
       <p class="muted small">여행 모드를 켜면 이후 포스팅이 이 가이드에 날짜별로 자동으로 쌓여요.</p>
@@ -1458,7 +1460,7 @@
         if (!g) break;
         const following = !!(db.progress[id] && db.progress[id].__on);
         openModal(`<h2>${esc(g.title)}</h2><div class="menu-list">
-          ${isMine(g) ? `<a class="btn ghost block" href="#/guide/${esc(id)}/edit">가이드 편집</a>` : `<button class="btn ghost block" data-act="follow" data-id="${esc(id)}">${following ? '따라가기 끄기' : '이 가이드 따라가기'}</button>`}
+          ${isMine(g) ? `<a class="btn ghost block" href="#/guide/${esc(id)}/edit">가이드 편집</a>${db.activeTripId === id ? '<button class="btn ghost block" data-act="end-trip">여행 마치기</button>' : `<button class="btn ghost block" data-act="resume-trip" data-id="${esc(id)}">이 여행 이어서 기록하기</button>`}` : `<button class="btn ghost block" data-act="follow" data-id="${esc(id)}">${following ? '따라가기 끄기' : '이 가이드 따라가기'}</button>`}
           <button class="btn ghost block" data-act="share" data-id="${esc(id)}">공유</button>
           ${isMine(g) ? '' : `<button class="btn ghost block danger" data-act="report" data-type="guide" data-id="${esc(id)}">신고</button>`}
           <button class="btn ghost block" data-close>닫기</button></div>`);
@@ -1533,10 +1535,23 @@
           if (cloud) quiet(push(cloud.deleteGuide(id)));
         }
         break;
-      case 'end-trip':
+      case 'end-trip': {
+        const g = db.guides[db.activeTripId];
+        closeModal();
+        if (!g || !(await confirmModal('여행을 마칠까요?', `「${esc(g.title)}」 기록을 마쳐요. 나중에 가이드에서 <b>이 여행 이어서 기록하기</b>로 언제든 더할 수 있어요.`, '여행 마치기'))) break;
         db.activeTripId = null; save(); route(); toast('여행을 마쳤어요. 가이드를 공유해보세요!');
         if (cloud) quiet(push(cloud.updateProfile({ active_trip_id: null })));
         break;
+      }
+      case 'resume-trip': {
+        const g = db.guides[id], cur = db.guides[db.activeTripId];
+        closeModal();
+        if (!g || !isMine(g)) break;
+        if (cur && cur.id !== id && !(await confirmModal('여행을 바꿀까요?', `지금 여행 중인 「${esc(cur.title)}」는 마치고 「${esc(g.title)}」에 이어서 기록해요.`, '이어서 기록하기'))) break;
+        db.activeTripId = id; save(); route(); toast('다시 여행 중이에요. 이제 올리는 포스팅이 이 가이드에 쌓여요.');
+        if (cloud) quiet(push(cloud.updateProfile({ active_trip_id: id })));
+        break;
+      }
       case 'geo':
         if (cloud && me() && !me().locationAgreedAt) {
           if (!(await confirmModal('위치기반서비스 이용에 동의할까요?', '현재 위치는 포스팅의 장소 입력에만 쓰고 따로 저장하지 않아요. <a href="#/legal/location" target="_blank">약관 보기</a>', '동의하고 사용'))) break;
