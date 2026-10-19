@@ -27,6 +27,12 @@ jobs:
           REF=$(grep -oP "supabaseUrl:\s*'https://\K[a-z0-9]+" js/config.js)
           [ -n "$SB_TOKEN" ] || fail "SUPABASE_ACCESS_TOKEN 비밀값이 없어요"
           [ -n "$RESEND_KEY" ] || fail "RESEND_API_KEY 비밀값이 없어요"
+          SB_TOKEN=$(printf %s "$SB_TOKEN" | tr -d '[:space:]')
+          case "$SB_TOKEN" in
+            sbp_*) echo "token: 개인 토큰 형식(sbp_)";;
+            eyJ*) fail "SUPABASE_ACCESS_TOKEN에 API 키(anon 또는 service_role)가 들어 있어요. Account > Access Tokens에서 만든 sbp_로 시작하는 토큰이 필요해요";;
+            *) echo "token: 알 수 없는 형식(앞 4자 ${SB_TOKEN:0:4}, 길이 ${#SB_TOKEN})";;
+          esac
           echo "project $REF"
 
           echo "== resend domains"
