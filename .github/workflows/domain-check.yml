@@ -1,0 +1,26 @@
+# 커스텀 도메인 연결 점검: DNS, GitHub Pages 설정, HTTPS 접속. Actions 탭에서 수동 실행.
+name: Check domain
+on: workflow_dispatch
+permissions:
+  pages: read
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          exec > >(tee /tmp/out) 2>&1
+          D=$(head -1 CNAME)
+          echo "== domain $D"
+          for n in "$D" "www.$D"; do for t in A AAAA CNAME; do echo "$n $t: $(dig +short $n $t @1.1.1.1 | tr '\n' ' ')"; done; done
+          echo "== pages api"
+          gh api repos/${{ github.repository }}/pages --jq '{cname, status, https_enforced, html_url, source, https_certificate}' || true
+          for u in "http://$D/" "https://$D/" "https://www.$D/" "https://hbyim.github.io/routejourney/"; do
+            echo "== $u"; curl -sS -o /dev/null -m 20 -w 'code %{http_code} -> %{redirect_url}\n' "$u" || true
+          done
+          echo "== https cert"
+          echo | openssl s_client -servername "$D" -connect "$D:443" 2>/dev/null | openssl x509 -noout -subject -issuer -dates || echo "no cert"
+          sleep 1; echo "::notice::$(sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g' /tmp/out)"
