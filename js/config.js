@@ -34,5 +34,5 @@ window.RL_CONFIG = {
   legalEffectiveDate: '2026-11-01',
 
   // 웹 주소. 안드로이드·iOS 앱 안에서는 페이지 주소가 기기 내부 주소라서, 공유 링크와 메일 링크에 이 주소를 쓴다.
-  publicUrl: 'https://mytripatoz.com/'
+  publicUrl: 'https://www.mytripatoz.com/'
 };
