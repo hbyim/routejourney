@@ -331,3 +331,6 @@ body { padding-top: env(safe-area-inset-top, 0px); }
 @media (pointer: coarse) {
   input, select, textarea, .input { font-size: max(16px, 1em) !important; }
 }
+.guide-fields { display: grid; gap: 10px; margin-top: 10px; padding: 14px; border-radius: 16px; background: var(--surface-2); }
+.guide-fields[hidden] { display: none; }
+.guide-fields .input { background: var(--surface); }

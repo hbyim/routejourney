@@ -933,6 +933,7 @@
           <label>스팟 이름<input class="input" name="name" required maxlength="80" placeholder="예: 시부야 스카이" list="spotNames" value="${sp ? esc(sp.name) : ''}"></label>
           <label>종류<select class="input" name="cat">${Object.entries(CATS).map(([k, v]) => `<option value="${k}" ${sp && sp.cat === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label>
         </div>
+        <label>지역·도시<input class="input" name="area" maxlength="40" placeholder="예: 도쿄 시부야" value="${sp ? esc(sp.area || '') : ''}"></label>
         <datalist id="spotNames">${Object.values(db.spots).map(s => `<option value="${esc(s.name)}">`).join('')}</datalist>
         ${pickMapHtml('postMap')}
         <div class="row between"><span class="small muted" id="locLabel">검색하거나 지도를 눌러 위치를 정해주세요.</span><button type="button" class="btn sm ghost" data-act="geo">현재 위치</button></div>
@@ -956,7 +957,17 @@
             ${mine.map(g => `<option value="${esc(g.id)}" ${g.id === active ? 'selected' : ''}>${esc(g.title)}${g.id === active ? ' (여행 중)' : ''}</option>`).join('')}
             <option value="__none">가이드에 넣지 않기</option>
           </select></label>
-        <p class="small muted">공개 가이드에 담긴 포스팅은 다른 사람에게 보여요. 남의 사진이나 다른 사람 얼굴이 크게 나온 사진은 올리지 말아주세요.</p>
+        <div id="guideFields" class="guide-fields">
+          <label>가이드 제목<input class="input" name="g_title" maxlength="60" placeholder="비우면 첫 스팟 이름으로 지어요"></label>
+          <div class="grid2">
+            <label>도시<input class="input" name="g_city" maxlength="40" placeholder="예: 도쿄"></label>
+            <label>여행 시작일<input class="input" type="date" name="g_start"></label>
+          </div>
+          <label>공개 대상<select class="input" name="g_vis">${Object.entries(VIS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
+          <label>가이드 소개 (선택)<textarea class="input" name="g_desc" rows="2" maxlength="200" placeholder="어떤 여행인지 한두 줄로 적어주세요"></textarea></label>
+          <label>가이드 태그 (쉼표로 구분)<input class="input" name="g_tags" maxlength="100" placeholder="먹방, 2박3일"></label>
+        </div>
+        <p class="small muted" id="visHint">공개 가이드에 담긴 포스팅은 다른 사람에게 보여요. 남의 사진이나 다른 사람 얼굴이 크게 나온 사진은 올리지 말아주세요.</p>
       </section>
       ${activeG ? `<p class="post-hint">${esc(activeG.title)} ${dayOf(activeG, new Date().toISOString())}일차에 쌓여요</p>` : ''}
       <div class="cta-bar"><button class="btn big" type="submit">올리기</button></div>`}
@@ -978,6 +989,27 @@
       });
     };
     form.addEventListener('input', steps);
+    // 담을 가이드를 고르면 그 가이드의 제목·도시·공개 대상을 채워 바로 고칠 수 있게 한다
+    const fillGuide = () => {
+      if (!form.guide) return;
+      const id = form.guide.value, g = db.guides[id];
+      $('#guideFields').hidden = id === '__none';
+      if (id === '__none') return;
+      const recent = guidesArr().filter(isMine).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+      form.g_title.value = g ? g.title : '';
+      form.g_city.value = g ? g.city || '' : (recent && recent.city) || '도쿄';
+      form.g_start.value = g ? g.startDate || '' : (form.at.value || new Date().toISOString()).slice(0, 10);
+      form.g_vis.value = g ? g.visibility || 'public' : 'public';
+      form.g_desc.value = g ? g.desc || '' : '';
+      form.g_tags.value = g ? (g.tags || []).join(', ') : '';
+      if (!form.area.value || form.area.dataset.auto) { form.area.value = form.g_city.value; form.area.dataset.auto = '1'; }
+    };
+    if (form.guide) {
+      form.guide.addEventListener('change', fillGuide);
+      form.g_city.addEventListener('input', () => { if (form.area.dataset.auto) form.area.value = form.g_city.value; });
+      form.area.addEventListener('input', () => { delete form.area.dataset.auto; });
+      fillGuide();
+    }
     const m = makeMap($('#postMap'), { zoom: 12, zoomPos: 'bottomright' });
     if (m) { postPicker = attachPicker(m, form, sp ? [sp.lat, sp.lng] : null, steps); attachPlaceSearch(form.querySelector('.place-search'), m, postPicker, form, $('#locLabel')); }
     else if (sp) { form.lat.value = sp.lat; form.lng.value = sp.lng; }
@@ -996,6 +1028,7 @@
     });
     form.name.addEventListener('change', () => {
       const s = Object.values(db.spots).find(x => x.name === form.name.value.trim());
+      if (s && s.area) { form.area.value = s.area; delete form.area.dataset.auto; }
       if (s && postPicker && m) { form.cat.value = s.cat; postPicker(s.lat, s.lng); m.setView([s.lat, s.lng], 15); $('#locLabel').textContent = '저장된 스팟 위치를 불러왔어요.'; }
       steps();
     });
@@ -1835,7 +1868,7 @@
       busy(true);
       const before = JSON.parse(JSON.stringify(p));
       const old = db.spots[p.spotId];
-      const r = findOrCreateSpot({ name: v.name, cat: v.cat, lat: +v.lat, lng: +v.lng, area: old ? old.area : '' });
+      const r = findOrCreateSpot({ name: v.name, cat: v.cat, lat: +v.lat, lng: +v.lng, area: v.area.trim() || (old ? old.area : '') });
       const s = r.spot;
       const photo = f.dataset.photo || null;
       Object.assign(p, {
@@ -1874,12 +1907,24 @@
       busy(true);
       const at = v.at ? new Date(v.at).toISOString() : new Date().toISOString();
       let gid = v.guide;
-      let g = null, newTrip = false;
+      let g = null, newTrip = false, gBefore = null;
+      const meta = gid === '__none' ? null : {
+        title: (v.g_title.trim() || `${v.name.trim()}에서 시작한 여행`).slice(0, 60), city: v.g_city.trim().slice(0, 40) || '도쿄',
+        startDate: v.g_start || at.slice(0, 10), visibility: VIS[v.g_vis] ? v.g_vis : 'public', desc: v.g_desc.trim().slice(0, 200), tags: tags(v.g_tags)
+      };
       if (gid === '__new') {
-        g = newGuide({ title: `${v.name.trim()}에서 시작한 여행`.slice(0, 60), startDate: at.slice(0, 10) });
+        g = newGuide(meta);
         db.guides[g.id] = g; db.activeTripId = g.id; gid = g.id; newTrip = true;
-      } else if (gid !== '__none') g = db.guides[gid];
-      const r = findOrCreateSpot({ name: v.name, cat: v.cat, lat: +v.lat, lng: +v.lng, area: g ? g.city : '' });
+      } else if (gid !== '__none') {
+        g = db.guides[gid];
+        if (g) {
+          gBefore = JSON.parse(JSON.stringify(g));
+          Object.assign(g, meta);
+          // 시작일이 바뀌면 이미 담긴 스팟의 일차도 다시 맞춘다
+          if (gBefore.startDate !== g.startDate) g.items.forEach(i => { const pp = db.posts[i.postId]; if (pp) i.day = dayOf(g, pp.at); });
+        }
+      }
+      const r = findOrCreateSpot({ name: v.name, cat: v.cat, lat: +v.lat, lng: +v.lng, area: v.area.trim() || (g ? g.city : '') });
       const s = r.spot;
       const photo = f.dataset.photo || null;
       const p = {
@@ -1905,6 +1950,7 @@
           delete db.posts[p.id];
           if (g) g.items = g.items.filter(i => i.postId !== p.id);
           if (newTrip) { delete db.guides[g.id]; db.activeTripId = null; }
+          else if (gBefore) { Object.keys(g).forEach(k => delete g[k]); Object.assign(g, gBefore); }
           busy(false);
           return;
         }
