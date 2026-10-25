@@ -970,7 +970,7 @@
         <p class="small muted" id="visHint">공개 가이드에 담긴 포스팅은 다른 사람에게 보여요. 남의 사진이나 다른 사람 얼굴이 크게 나온 사진은 올리지 말아주세요.</p>
       </section>
       ${activeG ? `<p class="post-hint">${esc(activeG.title)} ${dayOf(activeG, new Date().toISOString())}일차에 쌓여요</p>` : ''}
-      <div class="cta-bar"><button class="btn big" type="submit">올리기</button></div>`}
+      <div class="cta-bar row"><button type="button" class="btn ghost big" data-act="cancel-new">취소</button><button class="btn big grow" type="submit">올리기</button></div>`}
     </form>`;
   }
   let postPicker = null;
@@ -1440,6 +1440,16 @@
         e.preventDefault();
         if (history.length > 1) history.back(); else location.hash = '#/';
         break;
+      case 'cancel-new': {
+        e.preventDefault();
+        // 사진·장소·글 중 하나라도 채웠으면 버리기 전에 한 번 묻는다
+        const f = el.closest('form');
+        const dirty = f && (f.dataset.photo || f.name.value.trim() || f.text.value.trim());
+        const leave = () => { if (history.length > 1) history.back(); else location.hash = '#/'; };
+        if (!dirty) { leave(); break; }
+        confirmModal('작성을 취소할까요?', '입력한 사진과 내용은 저장되지 않아요.', '작성 취소', true).then(ok => { if (ok) leave(); });
+        break;
+      }
       case 'dismiss-intro':
         try { localStorage.setItem('routelog.intro', '1'); } catch (_) { /* noop */ }
         el.closest('.intro').remove();
