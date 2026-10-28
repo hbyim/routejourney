@@ -11,7 +11,9 @@
 - `scripts/copy-web.mjs`: 웹앱 파일(index.html, css, js, assets, vendor)을 `www/`로 복사
 - `android/`: 안드로이드 스튜디오 프로젝트
 - `ios/`: Xcode 프로젝트 (Swift Package Manager 사용, CocoaPods 필요 없음)
-- `assets/`: 아이콘·스플래시 원본. 바꾸면 `npm run assets`로 다시 만들어요.
+- `assets/`: 아이콘·스플래시 원본. 스플래시를 바꾸면 `npm run assets`로 다시 만들어요.
+  - 앱 아이콘은 2026-10-28 시안 파일(`assets/store/`)의 결과물을 안드로이드 `res/mipmap-*`와 iOS `AppIcon.appiconset`에 그대로 넣었어요. `npm run assets`를 돌리면 아이콘이 여백 있는 버전으로 다시 만들어지니, 돌린 뒤에는 아이콘 파일 변경을 되돌리세요.
+  - `assets/store/play-store-512.png`는 Play Console 등록정보용 512×512 아이콘이에요.
 
 ## 웹을 고친 뒤 앱에 반영하기
 
