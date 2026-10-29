@@ -36,6 +36,15 @@
       });
     }
 
+    // posts.weather 열을 아직 추가하지 않은 DB: 날씨만 빼고 다시 저장한다 (나머지 기록은 잃지 않게)
+    const withoutMissingWeather = async (row, send) => {
+      const res = await send(row);
+      if (!res.error || !/weather/.test(res.error.message || '')) return res;
+      console.warn('posts.weather 열이 없어 날씨 없이 저장해요. supabase/schema.sql 끝의 날씨 열 추가 SQL을 실행하세요.');
+      delete row.weather;
+      return send(row);
+    };
+
     // 쓰기는 한 줄로 세워 순서를 지킨다 (스팟 → 포스트 → 가이드 → 항목 순으로 외래키가 맞도록)
     let chain = Promise.resolve();
     const q = fn => { const p = chain.then(fn); chain = p.catch(() => {}); return p; };
@@ -44,7 +53,7 @@
     /* ---------- 행 ↔ 앱 모델 ---------- */
     const toUser = r => ({ id: r.id, name: r.name, bio: r.bio || '', color: r.color, activeTripId: r.active_trip_id, termsAgreedAt: r.terms_agreed_at, locationAgreedAt: r.location_agreed_at, marketing: r.marketing_agreed });
     const toSpot = r => ({ id: r.id, name: r.name, cat: r.cat, lat: r.lat, lng: r.lng, area: r.area || '' });
-    const toPost = r => ({ id: r.id, userId: r.user_id, spotId: r.spot_id, at: r.at, text: r.text || '', rating: r.rating, cost: r.cost || 0, currency: r.currency || 'JPY', tags: r.tags || [], photo: r.photo_url, hidden: r.hidden });
+    const toPost = r => ({ id: r.id, userId: r.user_id, spotId: r.spot_id, at: r.at, text: r.text || '', rating: r.rating, cost: r.cost || 0, currency: r.currency || 'JPY', weather: r.weather || null, tags: r.tags || [], photo: r.photo_url, hidden: r.hidden });
     const toComment = r => ({ id: r.id, postId: r.post_id, userId: r.user_id, body: r.body, at: r.created_at, hidden: r.hidden });
     // 덧글 테이블을 아직 안 만들었으면(서버 SQL 미실행) 알아들을 수 있는 말로 바꾼다
     const noTable = err => {
@@ -236,8 +245,8 @@
       createPost: (p, photoDataUrl) => q(async () => {
         let url = null;
         if (photoDataUrl) url = await api.uploadPhoto(p.id, photoDataUrl);
-        const row = { id: p.id, user_id: api.user.id, spot_id: p.spotId, at: p.at, text: p.text, rating: p.rating, cost: p.cost, currency: p.currency || 'JPY', tags: p.tags, photo_url: url };
-        const res = await sb.from('posts').insert(row);
+        const row = { id: p.id, user_id: api.user.id, spot_id: p.spotId, at: p.at, text: p.text, rating: p.rating, cost: p.cost, currency: p.currency || 'JPY', weather: p.weather || null, tags: p.tags, photo_url: url };
+        const res = await withoutMissingWeather(row, r => sb.from('posts').insert(r));
         if (res.error && /currency/.test(res.error.message || '')) {
           // posts.currency 열을 아직 추가하지 않은 DB: 엔은 예전처럼 저장하고, 다른 통화는 잘못된 금액이 남지 않게 막는다
           if (row.currency !== 'JPY') throw Object.assign(new Error(res.error.message), { userMessage: '아직 엔 외의 통화는 저장할 수 없어요. 운영자에게 알려주세요.' });
@@ -251,9 +260,9 @@
       updatePost: (p, photoDataUrl, oldPhotoUrl) => q(async () => {
         let url = null;
         if (photoDataUrl) url = await api.uploadPhoto(p.id, photoDataUrl, `${p.id}-${Date.now().toString(36)}`);
-        const row = { spot_id: p.spotId, at: p.at, text: p.text, rating: p.rating, cost: p.cost, currency: p.currency || 'JPY', tags: p.tags };
+        const row = { spot_id: p.spotId, at: p.at, text: p.text, rating: p.rating, cost: p.cost, currency: p.currency || 'JPY', weather: p.weather || null, tags: p.tags };
         if (url) row.photo_url = url;
-        await sb.from('posts').update(row).eq('id', p.id).eq('user_id', api.user.id).then(ok);
+        ok(await withoutMissingWeather(row, r => sb.from('posts').update(r).eq('id', p.id).eq('user_id', api.user.id)));
         const old = url && photoPath(oldPhotoUrl);
         if (old) await sb.storage.from('photos').remove([old]);
         return url;

@@ -35,6 +35,7 @@ create table if not exists public.posts (
   rating smallint check (rating between 1 and 5),
   cost integer not null default 0 check (cost >= 0),
   currency text not null default 'JPY' check (currency in ('KRW', 'JPY', 'USD', 'CNY')),
+  weather text check (weather in ('sunny', 'partly', 'cloudy', 'rain', 'storm', 'snow', 'fog')),
   tags text[] not null default '{}',
   photo_url text,
   hidden boolean not null default false,
@@ -136,6 +137,9 @@ alter table public.reports add constraint reports_target_type_check check (targe
 
 -- 이미 만든 DB에 쓴 돈 통화 열을 더한다 (원·엔은 그대로, 달러·위안은 1/100 단위로 cost에 저장)
 alter table public.posts add column if not exists currency text not null default 'JPY' check (currency in ('KRW', 'JPY', 'USD', 'CNY'));
+
+-- 이미 만든 DB에 방문 날씨 열을 더한다
+alter table public.posts add column if not exists weather text check (weather in ('sunny', 'partly', 'cloudy', 'rain', 'storm', 'snow', 'fog'));
 
 create index if not exists posts_user_idx on public.posts (user_id, at desc);
 create index if not exists posts_spot_idx on public.posts (spot_id);

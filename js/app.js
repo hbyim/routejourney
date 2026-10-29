@@ -66,6 +66,21 @@
     CNY: { label: '위안', dec: 2, fmt: v => v + '위안' }
   };
   const curOf = c => CURRENCIES[c] ? c : 'JPY';
+  // 방문했을 때 날씨. 포스팅할 때 그림으로 고르고, 스팟 화면에서 그곳의 날씨 기록을 모아 보여준다.
+  const SUN = '<circle cx="12" cy="12" r="4.2" fill="#f5b301"/><g stroke="#f5b301" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></g>';
+  const CLOUD = (fill, y = 0) => `<path transform="translate(0 ${y})" d="M7 18.5h10a4 4 0 0 0 .6-8 5.5 5.5 0 0 0-10.5 1.6A3.2 3.2 0 0 0 7 18.5z" fill="${fill}"/>`;
+  const WEATHER = {
+    sunny: { label: '맑음', svg: SUN },
+    partly: { label: '구름 조금', svg: '<g transform="translate(-3 -3) scale(.8)">' + SUN + '</g>' + CLOUD('#cfd8dc', 2) },
+    cloudy: { label: '흐림', svg: CLOUD('#90a4ae', -1) },
+    rain: { label: '비', svg: CLOUD('#78909c', -3) + '<g stroke="#1e88e5" stroke-width="2" stroke-linecap="round"><path d="M8.5 18.5l-1 2.5M12.5 18.5l-1 2.5M16.5 18.5l-1 2.5"/></g>' },
+    storm: { label: '뇌우', svg: CLOUD('#607d8b', -3) + '<path d="M12.5 15.5l-3 4.5h3l-1.5 3.5 4-5h-3l1.5-3z" fill="#f5b301"/>' },
+    snow: { label: '눈', svg: CLOUD('#b0bec5', -3) + '<g fill="#64b5f6"><circle cx="8.5" cy="19.5" r="1.3"/><circle cx="12.5" cy="21" r="1.3"/><circle cx="16.5" cy="19.5" r="1.3"/></g>' },
+    fog: { label: '안개', svg: CLOUD('#b0bec5', -4) + '<g stroke="#90a4ae" stroke-width="2" stroke-linecap="round"><path d="M4 17.5h16M6 21h12"/></g>' }
+  };
+  const wxIcon = (k, size = 20) => WEATHER[k] ? `<svg class="wx" viewBox="0 0 24 24" width="${size}" height="${size}" role="img" aria-label="${WEATHER[k].label}"><title>${WEATHER[k].label}</title>${WEATHER[k].svg}</svg>` : '';
+  const wxChip = k => WEATHER[k] ? `<span class="wx-chip">${wxIcon(k, 18)}${WEATHER[k].label}</span>` : '';
+  const wxOf = v => WEATHER[v] ? v : null;
   const toMinor = (v, c) => Math.max(0, Math.round((+v || 0) * (CURRENCIES[curOf(c)].dec ? 100 : 1)));
   function money(n, c) {
     if (!n) return '무료';
@@ -480,7 +495,7 @@
         <a href="#/spot/${esc(s.id)}" class="spot-line">${catChip(s.cat)}<b>${esc(s.name)}</b><span class="muted">${esc(s.area || '')}</span></a>
         ${mine && p.hidden ? '<p class="warn small">신고 누적으로 숨김 처리된 포스팅이에요.</p>' : ''}
         <p>${esc(p.text)}</p>
-        <div class="meta-row">${stars(p.rating)}<span class="muted">${money(p.cost, p.currency)}</span>${cmtLink(p)}</div>
+        <div class="meta-row">${stars(p.rating)}${wxChip(p.weather)}<span class="muted">${money(p.cost, p.currency)}</span>${cmtLink(p)}</div>
         ${inGuides.length ? `<p class="small muted">수록 가이드: ${inGuides.slice(0, 2).map(g => `<a href="#/guide/${esc(g.id)}">${esc(g.title)}</a>`).join(', ')}${inGuides.length > 2 ? ` 외 ${inGuides.length - 2}개` : ''}</p>` : ''}
       </div>
     </article>`;
@@ -687,7 +702,7 @@
                 ${photoBox(p, s, 'thumb', true)}
                 <div class="stop-info">
                   <a href="#/spot/${esc(s.id)}" class="stop-name">${esc(s.name)}</a>${added.has(it.id) ? ' <span class="badge-new">포크에서 추가</span>' : ''}
-                  <p class="stop-meta">${c.label}${p ? ` · ${fmtTime(p.at)}` : ''}${p && p.rating ? ` · <span class="st">★ ${p.rating}</span>` : ''}</p>
+                  <p class="stop-meta">${c.label}${p ? ` · ${fmtTime(p.at)}` : ''}${p && p.rating ? ` · <span class="st">★ ${p.rating}</span>` : ''}${p && WEATHER[p.weather] ? ` · ${wxIcon(p.weather, 16)}` : ''}</p>
                   ${p && p.text ? `<p class="stop-text clamp2">${esc(p.text)}</p>` : ''}
                   ${it.note ? `<p class="note">메모: ${esc(it.note)}</p>` : ''}
                   ${p ? `<p class="stop-links">${by && by.id !== g.ownerId ? `<span>${esc(by.name)}님의 기록</span>` : ''}${cmtLink(p)}${p.userId === db.me ? `<a href="#/post/${esc(p.id)}/edit">수정</a>` : ''}</p>` : ''}
@@ -942,6 +957,7 @@
       <section class="group">
         <h2>기록</h2>
         <div class="field-row first"><span>별점</span><div class="star-pick" role="radiogroup" aria-label="별점">${[5, 4, 3, 2, 1].map(n => `<input type="radio" name="rating" id="rate${n}" value="${n}" ${n === rating ? 'checked' : ''}><label for="rate${n}" title="${n}점" aria-label="${n}점">★</label>`).join('')}</div></div>
+        <div class="field-row"><span>날씨</span><div class="wx-pick" role="radiogroup" aria-label="날씨">${Object.entries(WEATHER).map(([k, w]) => `<input type="radio" name="weather" id="wx${k}" value="${k}" ${p && p.weather === k ? 'checked' : ''}><label for="wx${k}" title="${w.label}">${wxIcon(k, 28)}<small>${w.label}</small></label>`).join('')}</div></div>
         <div class="field-row"><span>지출</span><span class="money-input"><input class="input" type="number" name="cost" min="0" max="100000000" step="any" inputmode="decimal" placeholder="0" value="${costVal}" aria-label="쓴 돈"><span class="cur-seg" role="radiogroup" aria-label="통화">${Object.entries(CURRENCIES).map(([k, c]) => `<input type="radio" name="currency" id="cur${k}" value="${k}" ${k === cur ? 'checked' : ''}><label for="cur${k}">${c.label}</label>`).join('')}</span></span></div>
         <div class="field-row"><span>한 줄</span><textarea class="input" name="text" rows="2" maxlength="300" placeholder="여기서 뭐가 좋았나요?">${p ? esc(p.text) : ''}</textarea></div>
         <details class="more-fields"><summary>방문 시각 · 태그</summary><div>
@@ -989,6 +1005,14 @@
       });
     };
     form.addEventListener('input', steps);
+    // 날씨는 고르지 않아도 된다: 고른 그림을 한 번 더 누르면 선택이 풀린다
+    const wx = form.querySelector('.wx-pick');
+    if (wx) wx.addEventListener('click', e => {
+      const lb = e.target.closest('label');
+      if (!lb) return;
+      const inp = form.querySelector('#' + lb.htmlFor);
+      if (inp && inp.checked) { e.preventDefault(); inp.checked = false; }
+    });
     // 담을 가이드를 고르면 그 가이드의 제목·도시·공개 대상을 채워 바로 고칠 수 있게 한다
     const fillGuide = () => {
       if (!form.guide) return;
@@ -1129,6 +1153,25 @@
   }
 
   /* ---------- 화면: 스팟 ---------- */
+  // 이 스팟에 남긴 날씨 기록: 최근 날씨와, 달별로 어떤 날씨가 많았는지
+  function spotWeather(ps) {
+    const w = ps.filter(p => WEATHER[p.weather]);
+    if (!w.length) return '';
+    const count = {}, byMonth = {};
+    w.forEach(p => {
+      count[p.weather] = (count[p.weather] || 0) + 1;
+      const m = new Date(p.at).getMonth() + 1;
+      (byMonth[m] = byMonth[m] || {})[p.weather] = (byMonth[m][p.weather] || 0) + 1;
+    });
+    const top = o => Object.entries(o).sort((a, b) => b[1] - a[1])[0][0];
+    const months = Object.keys(byMonth).map(Number).sort((a, b) => a - b);
+    return `<div class="wx-summary">
+      <p><b>날씨 기록</b> <span class="muted small">방문한 사람들이 남긴 날씨예요</span></p>
+      <p class="wx-latest">최근 ${wxChip(w[0].weather)}<span class="muted small">${ago(w[0].at)}</span></p>
+      <div class="wx-counts">${Object.keys(WEATHER).filter(k => count[k]).map(k => `<span>${wxIcon(k, 22)}<small>${WEATHER[k].label} ${count[k]}</small></span>`).join('')}</div>
+      ${months.length > 1 ? `<div class="wx-months">${months.map(m => `<span>${wxIcon(top(byMonth[m]), 20)}<small>${m}월</small></span>`).join('')}</div>` : ''}
+    </div>`;
+  }
   function viewSpot(id) {
     const s = db.spots[id];
     if (!s) return notFound();
@@ -1140,6 +1183,7 @@
     <section class="card pad spot-head">
       <div>${catChip(s.cat)}<h1>${esc(s.name)}</h1><p class="muted">${esc(s.area)}${s.area ? ' · ' : ''}평균 ★ ${avg} · 포스팅 ${ps.length} · 가이드 ${gs.length}</p>
       ${ps[0] ? `<p class="small muted">최근 방문 기록: ${ago(ps[0].at)}. 영업시간·가격은 바뀌었을 수 있어요.</p>` : ''}
+      ${spotWeather(ps)}
       <div class="row"><a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}">지도 앱에서 열기</a></div></div>
       <div class="map-box small-map" id="spotMap"></div>
     </section>
@@ -1895,7 +1939,7 @@
       const photo = f.dataset.photo || null;
       Object.assign(p, {
         spotId: s.id, at: v.at ? new Date(v.at).toISOString() : p.at, text: v.text.trim().slice(0, 300), rating: +v.rating || null,
-        cost: toMinor(v.cost, v.currency), currency: curOf(v.currency), tags: tags(v.tags)
+        cost: toMinor(v.cost, v.currency), currency: curOf(v.currency), weather: wxOf(v.weather), tags: tags(v.tags)
       });
       if (photo) p.photo = photo;
       lastCurrency(p.currency);
@@ -1951,7 +1995,7 @@
       const photo = f.dataset.photo || null;
       const p = {
         id: uid('p'), userId: db.me, spotId: s.id, at, text: v.text.trim().slice(0, 300), rating: +v.rating || null,
-        cost: toMinor(v.cost, v.currency), currency: curOf(v.currency), tags: tags(v.tags), photo
+        cost: toMinor(v.cost, v.currency), currency: curOf(v.currency), weather: wxOf(v.weather), tags: tags(v.tags), photo
       };
       db.posts[p.id] = p;
       lastCurrency(p.currency);

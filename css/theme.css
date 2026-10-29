@@ -342,3 +342,20 @@ body { padding-top: env(safe-area-inset-top, 0px); }
 .btn.social.google { background: #fff; color: #1f1f1f; border: 1px solid #dadce0; }
 .btn.social.facebook { background: #1877f2; color: #fff; border-color: #1877f2; }
 .btn.social.kakao { background: #fee500; color: rgba(0,0,0,.85); border-color: #fee500; }
+
+/* 날씨 */
+.wx { flex: none; vertical-align: -4px; }
+.wx-chip { display: inline-flex; align-items: center; gap: 4px; font-size: .85rem; color: var(--muted); }
+.wx-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.wx-pick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.wx-pick label { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 52px; padding: 6px 4px; border: 1.5px solid var(--line); border-radius: 12px; cursor: pointer; font-weight: 400 !important; }
+.wx-pick label small { font-size: .72rem; color: var(--muted); white-space: nowrap; }
+.wx-pick input:checked + label { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.wx-pick input:checked + label small { color: var(--accent); font-weight: 600; }
+.wx-pick input:focus-visible + label { outline: 3px solid var(--accent); }
+.wx-summary { margin-top: 10px; padding: 12px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 6%, transparent); display: grid; gap: 8px; }
+.wx-summary p { margin: 0; }
+.wx-latest { display: flex; align-items: center; gap: 8px; }
+.wx-counts, .wx-months { display: flex; flex-wrap: wrap; gap: 12px; }
+.wx-counts span, .wx-months span { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.wx-counts small, .wx-months small { font-size: .75rem; color: var(--muted); }
