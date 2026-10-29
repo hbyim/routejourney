@@ -38,6 +38,7 @@ jobs:
           exec > >(tee /tmp/out) 2>&1
           fail() { echo "ERROR: $*"; sleep 1; echo "::error::$(sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g' /tmp/out)"; exit 1; }
           [ -n "$SB_TOKEN" ] || fail "SUPABASE_ACCESS_TOKEN 비밀값이 없어요"
+          SB_TOKEN=$(printf %s "$SB_TOKEN" | tr -d '[:space:]')
           REF=$(grep -oP "supabaseUrl:\s*'https://\K[a-z0-9]+" js/config.js)
           API="https://api.supabase.com/v1/projects/$REF/config/auth"
           code=$(curl -s -o /tmp/cfg -w '%{http_code}' "$API" -H "Authorization: Bearer $SB_TOKEN")
