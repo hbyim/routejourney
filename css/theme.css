@@ -110,7 +110,7 @@ h2 { font-size: 1.12rem; letter-spacing: -.015em; }
   .navlinks a.on { background: var(--accent-soft); color: var(--accent); }
   .navlinks a.cta { background: var(--ink); color: var(--ink-on); border-radius: 999px; justify-content: center; }
 }
-.brand-mark { background-color: var(--accent); border-radius: 10px; }
+.brand-mark { border-radius: 8px; }
 
 /* ---------- 지도 ---------- */
 .map-box { border: 0; border-radius: var(--radius); background: var(--map-land); box-shadow: var(--shadow); }
