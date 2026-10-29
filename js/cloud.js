@@ -17,6 +17,25 @@
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' }
     });
 
+    // 앱: 소셜 로그인을 마친 브라우저가 com.mytripatoz.routelog://auth#access_token=... 로 앱을 다시 연다
+    const Plugins = window.Capacitor && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins;
+    const NATIVE_AUTH = 'com.mytripatoz.routelog://auth';
+    if (Plugins && Plugins.App) {
+      Plugins.App.addListener('appUrlOpen', async ({ url }) => {
+        if (!url || !url.startsWith(NATIVE_AUTH)) return;
+        if (Plugins.Browser) Plugins.Browser.close().catch(() => {});
+        const p = new URLSearchParams(url.slice(NATIVE_AUTH.length).replace(/^[/?#]+/, '').replace('#', '&'));
+        try {
+          if (p.get('access_token')) ok(await sb.auth.setSession({ access_token: p.get('access_token'), refresh_token: p.get('refresh_token') }));
+          else if (p.get('code')) ok(await sb.auth.exchangeCodeForSession(p.get('code')));
+          else throw new Error(p.get('error_description') || p.get('error') || 'no token');
+        } catch (err) {
+          console.error(err);
+          window.dispatchEvent(new CustomEvent('routelog:oauth-error', { detail: String(err && err.message || err) }));
+        }
+      });
+    }
+
     // 쓰기는 한 줄로 세워 순서를 지킨다 (스팟 → 포스트 → 가이드 → 항목 순으로 외래키가 맞도록)
     let chain = Promise.resolve();
     const q = fn => { const p = chain.then(fn); chain = p.catch(() => {}); return p; };
@@ -271,7 +290,19 @@
         return data;
       },
       async signInOAuth(provider) {
+        // 앱 안에서는 구글이 웹뷰 로그인을 막으므로 기기 브라우저로 열고, 끝나면 앱 주소(NATIVE_AUTH)로 돌아온다
+        if (Plugins && Plugins.Browser) {
+          const data = ok(await sb.auth.signInWithOAuth({ provider, options: { redirectTo: NATIVE_AUTH, skipBrowserRedirect: true } }));
+          await Plugins.Browser.open({ url: data.url, presentationStyle: 'popover' });
+          return data;
+        }
         return ok(await sb.auth.signInWithOAuth({ provider, options: { redirectTo: webBase() } }));
+      },
+      // 서버에서 켜 둔 소셜 로그인 목록 ({ google: true, apple: false, ... })
+      async providers() {
+        const r = await fetch(cfg.supabaseUrl + '/auth/v1/settings', { headers: { apikey: cfg.supabaseAnonKey } });
+        if (!r.ok) throw new Error('settings ' + r.status);
+        return (await r.json()).external || {};
       },
       async signOut() { await sb.auth.signOut(); api.user = null; },
       async deleteAccount() {

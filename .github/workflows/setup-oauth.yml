@@ -1,0 +1,82 @@
+# Supabase 소셜 로그인(Apple, Google, Facebook)을 켜고, 앱으로 돌아오는 주소를 허용 목록에 넣습니다. Actions 탭에서 수동 실행.
+# 비밀값이 있는 로그인만 켭니다. 없는 것은 건드리지 않아요. apply=false 이면 지금 상태만 보여줍니다.
+# 필요한 저장소 비밀값:
+#   SUPABASE_ACCESS_TOKEN (sbp_ 개인 토큰)
+#   Google:   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+#   Facebook: FACEBOOK_APP_ID, FACEBOOK_APP_SECRET
+#   Apple:    APPLE_SERVICES_ID, APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY(.p8 파일 내용 전체)
+# 애플 비밀값(JWT)은 최대 6개월만 유효해서, 이 작업을 6개월 안에 다시 돌려야 해요(매월 1일 자동 실행).
+name: Setup Social Login
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 설정을 실제로 바꿀지
+        type: boolean
+        default: false
+  schedule:
+    - cron: '0 3 1 * *'
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      SB_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      GOOGLE_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      FB_ID: ${{ secrets.FACEBOOK_APP_ID }}
+      FB_SECRET: ${{ secrets.FACEBOOK_APP_SECRET }}
+      APPLE_ID: ${{ secrets.APPLE_SERVICES_ID }}
+      APPLE_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_KID: ${{ secrets.APPLE_KEY_ID }}
+      APPLE_KEY: ${{ secrets.APPLE_PRIVATE_KEY }}
+      # 예약 실행은 애플 비밀값 갱신용이라 바로 적용한다
+      APPLY: ${{ github.event_name == 'schedule' || github.event.inputs.apply == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          exec > >(tee /tmp/out) 2>&1
+          fail() { echo "ERROR: $*"; sleep 1; echo "::error::$(sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g' /tmp/out)"; exit 1; }
+          [ -n "$SB_TOKEN" ] || fail "SUPABASE_ACCESS_TOKEN 비밀값이 없어요"
+          REF=$(grep -oP "supabaseUrl:\s*'https://\K[a-z0-9]+" js/config.js)
+          API="https://api.supabase.com/v1/projects/$REF/config/auth"
+          code=$(curl -s -o /tmp/cfg -w '%{http_code}' "$API" -H "Authorization: Bearer $SB_TOKEN")
+          [ "$code" = 200 ] || fail "Supabase 설정을 읽지 못했어요(HTTP $code)"
+          echo "== 지금 상태"
+          jq -c '{google: .external_google_enabled, facebook: .external_facebook_enabled, apple: .external_apple_enabled, kakao: .external_kakao_enabled, uri_allow_list}' /tmp/cfg
+          echo "콜백 주소(각 개발자 콘솔에 등록): https://$REF.supabase.co/auth/v1/callback"
+
+          body='{}'
+          add() { body=$(jq -c --argjson x "$1" '. + $x' <<<"$body"); }
+          if [ -n "$GOOGLE_ID" ] && [ -n "$GOOGLE_SECRET" ]; then
+            echo "Google: 켬"; add "$(jq -nc --arg id "$GOOGLE_ID" --arg s "$GOOGLE_SECRET" '{external_google_enabled: true, external_google_client_id: $id, external_google_secret: $s}')"
+          else echo "Google: 비밀값 없음, 건너뜀"; fi
+          if [ -n "$FB_ID" ] && [ -n "$FB_SECRET" ]; then
+            echo "Facebook: 켬"; add "$(jq -nc --arg id "$FB_ID" --arg s "$FB_SECRET" '{external_facebook_enabled: true, external_facebook_client_id: $id, external_facebook_secret: $s}')"
+          else echo "Facebook: 비밀값 없음, 건너뜀"; fi
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_TEAM" ] && [ -n "$APPLE_KID" ] && [ -n "$APPLE_KEY" ]; then
+            # .p8 키로 애플 client secret(JWT, ES256, 180일)을 만든다
+            JWT=$(node -e '
+              const c = require("crypto"), e = process.env, b = o => Buffer.from(JSON.stringify(o)).toString("base64url");
+              const now = Math.floor(Date.now() / 1000);
+              const data = b({ alg: "ES256", kid: e.APPLE_KID }) + "." + b({ iss: e.APPLE_TEAM, iat: now, exp: now + 180 * 86400, aud: "https://appleid.apple.com", sub: e.APPLE_ID });
+              const sig = c.sign("sha256", Buffer.from(data), { key: e.APPLE_KEY.replace(/\\n/g, "\n"), dsaEncoding: "ieee-p1363" }).toString("base64url");
+              console.log(data + "." + sig);') || fail "APPLE_PRIVATE_KEY로 서명하지 못했어요. .p8 파일 내용 전체(BEGIN/END 줄 포함)를 넣었는지 확인하세요"
+            # 웹 로그인은 Services ID, iOS 앱은 번들 ID를 쓴다
+            echo "Apple: 켬 (비밀값 180일 유효)"; add "$(jq -nc --arg id "$APPLE_ID,com.mytripatoz.routelog" --arg s "$JWT" '{external_apple_enabled: true, external_apple_client_id: $id, external_apple_secret: $s}')"
+          else echo "Apple: 비밀값 없음, 건너뜀"; fi
+
+          # 앱에서 로그인을 마치고 돌아오는 주소를 허용 목록에 더한다
+          ALLOW=$(jq -r '.uri_allow_list // ""' /tmp/cfg)
+          case ",$ALLOW," in *",com.mytripatoz.routelog://auth"*) ;; *) ALLOW="${ALLOW:+$ALLOW,}com.mytripatoz.routelog://auth**"; echo "허용 주소에 앱 주소 추가";; esac
+          add "$(jq -nc --arg a "$ALLOW" '{uri_allow_list: $a}')"
+
+          if [ "$APPLY" != true ]; then
+            echo "apply=false, 바꾸지 않음. 바꿀 항목: $(jq -c 'keys' <<<"$body")"
+          else
+            code=$(curl -s -o /tmp/res -w '%{http_code}' -X PATCH "$API" -H "Authorization: Bearer $SB_TOKEN" -H 'Content-Type: application/json' --data "$body")
+            [ "$code" = 200 ] || fail "설정 변경 실패(HTTP $code): $(head -c 300 /tmp/res)"
+            echo "== 적용 후"
+            jq -c '{google: .external_google_enabled, facebook: .external_facebook_enabled, apple: .external_apple_enabled, uri_allow_list}' /tmp/res
+          fi
+          sleep 1; echo "::notice::$(sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g' /tmp/out)"

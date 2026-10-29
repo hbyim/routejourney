@@ -18,6 +18,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 소셜 로그인 뒤 브라우저에서 앱으로 돌아오는 주소 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.mytripatoz.routelog" android:host="auth" />
+            </intent-filter>
         </activity>
 
         <provider
