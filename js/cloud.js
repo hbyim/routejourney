@@ -11,10 +11,26 @@
   function create(cfg) {
     const webBase = () => (window.Capacitor && window.Capacitor.isNativePlatform() && cfg.publicUrl) || location.origin + location.pathname;
     if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase) return null;
+    // 앱: 웹뷰 localStorage는 앱을 껐다 켜거나 iOS가 저장 공간을 정리할 때 지워질 수 있어서,
+    // 로그인 정보는 기기 저장소(iOS UserDefaults, 안드로이드 SharedPreferences)에 둔다.
+    // 예전 버전이 localStorage에 남긴 로그인 정보가 있으면 처음 한 번 옮겨 온다.
+    const Prefs = window.Capacitor && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences;
+    const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, del: k => { try { localStorage.removeItem(k); } catch (e) { /* noop */ } } };
+    const storage = Prefs ? {
+      async getItem(key) {
+        const { value } = await Prefs.get({ key });
+        if (value != null) return value;
+        const old = ls.get(key);
+        if (old != null) { await Prefs.set({ key, value: old }); ls.del(key); }
+        return old;
+      },
+      setItem: (key, value) => Prefs.set({ key, value }),
+      removeItem: key => Prefs.remove({ key })
+    } : undefined;
     const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
       // 로그인 링크를 요청한 브라우저가 아닌 곳(메일 앱 안 브라우저, 다른 기기)에서 열어도 로그인되도록 implicit 방식을 쓴다.
       // pkce는 요청한 브라우저에만 남는 검증값이 필요해서, 다른 곳에서 링크를 열면 조용히 실패한다.
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' }
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit', storage }
     });
 
     // 앱: 소셜 로그인을 마친 브라우저가 com.mytripatoz.routelog://auth#access_token=... 로 앱을 다시 연다
