@@ -29,7 +29,8 @@ android {
     }
     buildTypes {
         release {
-            if (System.getenv("ANDROID_KEYSTORE_FILE")) signingConfig signingConfigs.release
+            // 업로드 키가 없으면 설치해 볼 수 있게 디버그 키로 서명한다 (스토어에는 못 올림)
+            signingConfig System.getenv("ANDROID_KEYSTORE_FILE") ? signingConfigs.release : signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

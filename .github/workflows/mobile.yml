@@ -1,13 +1,21 @@
-# 안드로이드·iOS 앱 빌드 확인. 안드로이드는 설치용 APK와 스토어 업로드용 AAB(서명 전)를 만들고, iOS는 시뮬레이터용으로 빌드만 확인합니다.
+# 안드로이드·iOS 앱 빌드 확인. 안드로이드는 설치용 APK와 스토어 업로드용 AAB를 만들고, iOS는 시뮬레이터용으로 빌드만 확인합니다.
+# Actions 탭에서 release를 체크해 실행하면 릴리스 APK를 GitHub Releases에 올립니다.
+# 업로드 키(ANDROID_KEYSTORE_*)가 없으면 디버그 키로 서명돼서, 설치는 되지만 스토어에는 못 올려요.
 name: Mobile build
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: 릴리스 APK를 GitHub Releases에 올릴지
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths: ['mobile/**', 'js/**', 'css/**', 'index.html', '.github/workflows/mobile.yml']
 jobs:
   android:
     runs-on: ubuntu-latest
+    permissions: { contents: write }
     defaults: { run: { working-directory: mobile } }
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +27,7 @@ jobs:
       - name: 서명 키 준비 (비밀값이 있을 때만)
         env: { KS: '${{ secrets.ANDROID_KEYSTORE_BASE64 }}' }
         run: if [ -n "$KS" ]; then echo "$KS" | base64 -d > "$RUNNER_TEMP/upload.jks" && echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"; fi
-      - run: cd android && ./gradlew --no-daemon assembleDebug bundleRelease
+      - run: cd android && ./gradlew --no-daemon assembleDebug assembleRelease bundleRelease
         env:
           VERSION_CODE: ${{ github.run_number }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -27,14 +35,32 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       - name: 스토어용 AAB 서명 확인
         run: |
-          if keytool -printcert -jarfile android/app/build/outputs/bundle/release/app-release.aab >/tmp/cert 2>&1 && grep -q Owner /tmp/cert; then
+          keytool -printcert -jarfile android/app/build/outputs/bundle/release/app-release.aab >/tmp/cert 2>&1 || true
+          if grep -q Owner /tmp/cert && ! grep -q "Android Debug" /tmp/cert; then
+            echo "STORE_SIGNED=1" >> "$GITHUB_ENV"
             echo "::notice::AAB 서명됨 (버전 코드 ${{ github.run_number }}): $(grep -m1 Owner /tmp/cert)"
-          else echo "::warning::AAB가 서명되지 않았어요. ANDROID_KEYSTORE_* 비밀값을 넣어야 스토어에 올릴 수 있어요."; fi
+          else echo "::warning::AAB·APK가 업로드 키로 서명되지 않았어요(디버그 키). ANDROID_KEYSTORE_* 비밀값을 넣어야 스토어에 올릴 수 있어요."; fi
+      - name: GitHub Releases에 APK 올리기
+        if: github.event.inputs.release == 'true'
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          V="1.0.${{ github.run_number }}"
+          cp android/app/build/outputs/apk/release/app-release.apk "routelog-$V.apk"
+          if [ -n "$STORE_SIGNED" ]; then
+            NOTE="루트로그 안드로이드 $V (버전 코드 ${{ github.run_number }}). 업로드 키로 서명된 릴리스 APK예요."
+          else
+            NOTE="루트로그 안드로이드 $V (버전 코드 ${{ github.run_number }}). 테스트 배포용이에요: 디버그 키로 서명돼서 스토어에는 올릴 수 없고, 나중에 스토어 버전을 깔려면 이 앱을 먼저 지워야 해요."
+          fi
+          gh release create "android-v$V" "routelog-$V.apk" --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "루트로그 안드로이드 $V" --notes "$NOTE
+
+          설치: 안드로이드 폰에서 이 페이지를 열고 routelog-$V.apk를 받아 실행하세요. '출처를 알 수 없는 앱 설치'를 허용해야 할 수 있어요."
+          echo "::notice::릴리스 android-v$V 만듦"
       - uses: actions/upload-artifact@v4
         with:
           name: routelog-android
           path: |
             mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            mobile/android/app/build/outputs/apk/release/app-release.apk
             mobile/android/app/build/outputs/bundle/release/app-release.aab
   ios:
     runs-on: macos-latest
