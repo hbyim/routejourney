@@ -317,7 +317,10 @@
       async signInOAuth(provider) {
         // 앱 안에서는 구글이 웹뷰 로그인을 막으므로 기기 브라우저로 열고, 끝나면 앱 주소(NATIVE_AUTH)로 돌아온다
         if (Plugins && Plugins.Browser) {
-          const data = ok(await sb.auth.signInWithOAuth({ provider, options: { redirectTo: NATIVE_AUTH, skipBrowserRedirect: true } }));
+          // 웹 주소(app-auth.html)로 받아서 앱 주소로 넘긴다. 앱 주소를 바로 쓰면 서버 허용 목록에 없을 때 웹사이트로 가 버리고,
+          // 일부 브라우저는 사용자가 누르지 않은 앱 주소 이동을 막는다.
+          const redirectTo = cfg.publicUrl ? cfg.publicUrl.replace(/\/?$/, '/') + 'app-auth.html' : NATIVE_AUTH;
+          const data = ok(await sb.auth.signInWithOAuth({ provider, options: { redirectTo, skipBrowserRedirect: true } }));
           await Plugins.Browser.open({ url: data.url, presentationStyle: 'popover' });
           return data;
         }

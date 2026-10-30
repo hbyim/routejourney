@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>루트로그 앱으로 돌아가기</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; background: #f3f6f6; color: #13292b; text-align: center; padding: 24px; box-sizing: border-box; }
+  img { width: 72px; height: 72px; border-radius: 16px; }
+  a { display: inline-block; margin-top: 16px; padding: 14px 28px; border-radius: 999px; background: #0e6b73; color: #fff; text-decoration: none; font-weight: 700; }
+  p { color: #5c6b6d; }
+</style>
+</head>
+<body>
+<main>
+  <img src="assets/icon.svg" alt="">
+  <h1>로그인했어요</h1>
+  <p>루트로그 앱으로 돌아가는 중이에요.<br>앱이 열리지 않으면 아래 버튼을 눌러주세요.</p>
+  <a id="go" href="com.mytripatoz.routelog://auth">앱으로 돌아가기</a>
+</main>
+<script>
+  // 앱의 소셜 로그인은 이 주소로 돌아온다. 받은 로그인 값(주소 뒤 #access_token=... 또는 ?code=...)을 그대로 앱 주소에 붙여 앱을 연다.
+  // 브라우저가 자동 이동을 막으면 버튼을 눌러 열 수 있다.
+  (function () {
+    var target = 'com.mytripatoz.routelog://auth' + location.search + location.hash;
+    document.getElementById('go').href = target;
+    history.replaceState(null, '', location.pathname);
+    location.href = target;
+  })();
+</script>
+</body>
+</html>
