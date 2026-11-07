@@ -21,14 +21,14 @@ window.RL_CONFIG = {
   // 운영자 정보: 약관, 개인정보처리방침, 화면 하단에 표시됩니다.
   operator: {
     serviceName: '루트로그',
-    companyName: '',          // 상호
-    ceo: '',                  // 대표자
-    businessNumber: '',       // 사업자등록번호
+    companyName: 'linkandpick(링크앤픽)', // 상호
+    ceo: '장연옥',            // 대표자
+    businessNumber: '202-32-02207', // 사업자등록번호
     mailOrderNumber: '',      // 통신판매업 신고번호 (유료 기능 도입 시)
     locationBusinessNumber: '', // 위치기반서비스사업 신고번호
-    address: '',
+    address: '서울특별시 광진구 아차산로70길 62, 303동 205호(광장동, 현대아파트)',
     email: 'support@mytripatoz.com', // 고객 문의 및 신고 접수
-    privacyOfficer: '',       // 개인정보 보호책임자 이름
+    privacyOfficer: '장연옥', // 개인정보 보호책임자 이름
     privacyEmail: ''
   },
   legalEffectiveDate: '2026-11-01',
