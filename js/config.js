@@ -27,7 +27,7 @@ window.RL_CONFIG = {
     mailOrderNumber: '',      // 통신판매업 신고번호 (유료 기능 도입 시)
     locationBusinessNumber: '', // 위치기반서비스사업 신고번호
     address: '',
-    email: '',                // 고객 문의 및 신고 접수
+    email: 'support@mytripatoz.com', // 고객 문의 및 신고 접수
     privacyOfficer: '',       // 개인정보 보호책임자 이름
     privacyEmail: ''
   },
