@@ -240,13 +240,14 @@ h2 { font-size: 1.12rem; letter-spacing: -.015em; }
 .lineage { box-shadow: none; background: var(--surface-2); }
 .cta-bar { position: sticky; z-index: 900; bottom: calc(var(--tab-h) + 10px + env(safe-area-inset-bottom)); margin-top: 18px; }
 .cta-bar .btn { width: 100%; box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 30%, transparent); }
-.guide-head .back { display: none; }
+.guide-head .g-top { display: none; }
+.g-more svg { width: 18px; height: 18px; fill: currentColor; }
 @media (min-width: 768px) { .cta-bar { bottom: 20px; } }
 @media (min-width: 1024px) {
   .g-hero { display: none; }
   .guide-page .sheet { margin: 0; border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
   .guide-page .sheet::before { display: none; }
-  .guide-head .back { display: inline-block; }
+  .guide-head .g-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
   .guide-side .map-box { border-radius: var(--radius); }
 }
 
