@@ -71,7 +71,7 @@
 <tr><td>GitHub, Inc.</td><td>웹 페이지 호스팅(개인정보 미저장)</td><td>미국, 네트워크 전송</td></tr>
 </tbody></table>
 <h2>4. 이용자의 권리</h2>
-<p>이용자는 언제든지 자신의 개인정보를 열람·정정·삭제하거나 처리 정지를 요구할 수 있습니다. 프로필 화면에서 직접 수정하거나 탈퇴할 수 있고, 아래 연락처로 요청할 수도 있습니다.</p>
+<p>이용자는 언제든지 자신의 개인정보를 열람·정정·삭제하거나 처리 정지를 요구할 수 있습니다. 프로필 화면에서 직접 수정하거나 탈퇴할 수 있고, 아래 연락처로 요청할 수도 있습니다. 계정 삭제 방법은 <a href="#/legal/delete">계정 삭제 안내</a>에 있습니다.</p>
 <h2>5. 파기</h2>
 <p>탈퇴하면 계정, 프로필, 게시물, 사진을 지체 없이 삭제합니다. 법령상 보관 의무가 있는 정보는 해당 기간 동안 분리 보관 후 파기합니다.</p>
 <h2>6. 안전성 확보 조치</h2>
@@ -82,6 +82,37 @@
 <p>책임자: ${v(o.privacyOfficer)} · 연락처: ${v(o.privacyEmail || o.email)}</p>
 <p>개인정보 침해 신고: 개인정보침해신고센터(privacy.kisa.or.kr, 118), 개인정보분쟁조정위원회(kopico.go.kr, 1833-6972)</p>
 <p class="muted">시행일: ${eff()}</p>`;
+      }
+    },
+    delete: {
+      title: '계정 삭제 안내',
+      body: () => {
+        const o = op(), s = v(o.serviceName, '루트로그'), mail = esc(o.email || '');
+        const mailLink = mail ? `<a href="mailto:${mail}?subject=${encodeURIComponent('[' + (o.serviceName || '루트로그') + '] 계정 삭제 요청')}">${mail}</a>` : '고객 문의 메일';
+        return `
+<p>${s} 계정은 로그인하지 않고도 이 페이지의 방법으로 언제든 삭제를 요청할 수 있습니다. 삭제하면 되돌릴 수 없습니다.</p>
+<h2>1. 앱에서 직접 삭제하기</h2>
+<ol>
+<li>${s} 앱을 열고 아래쪽 <b>프로필</b> 탭을 누릅니다.</li>
+<li>화면 아래의 <b>회원 탈퇴</b>를 누르고, 확인 창에서 <b>탈퇴</b>를 누릅니다.</li>
+<li>계정과 데이터가 바로 삭제됩니다.</li>
+</ol>
+<h2>2. 웹에서 삭제하기</h2>
+<p>앱을 지웠다면 <a href="${esc((window.RL_CONFIG || {}).publicUrl || 'https://mytripatoz.com/')}">${esc(((window.RL_CONFIG || {}).publicUrl || 'https://mytripatoz.com/').replace(/^https?:\/\/|\/$/g, ''))}</a>에 같은 계정으로 로그인한 뒤 <b>프로필 &gt; 회원 탈퇴</b>로 삭제할 수 있습니다.</p>
+<h2>3. 로그인할 수 없을 때 메일로 요청하기</h2>
+<p>가입한 이메일 주소에서 ${mailLink}로 "계정 삭제 요청"이라고 보내주세요. 본인 확인 후 영업일 기준 7일 안에 삭제하고 결과를 알려드립니다.</p>
+<h2>4. 삭제되는 정보</h2>
+<ul>
+<li>계정 정보: 이메일 주소, 소셜 로그인 식별자, 비밀번호</li>
+<li>프로필: 닉네임, 소개, 약관·위치기반서비스 동의 기록</li>
+<li>내가 올린 가이드, 포스팅, 사진, 덧글</li>
+<li>좋아요, 저장, 팔로우, 차단, 따라가기 기록, 내가 한 신고</li>
+</ul>
+<h2>5. 삭제 후에도 남는 정보</h2>
+<ul>
+<li>다른 이용자가 포크한 가이드에 들어간 장소 이름과 위치는 작성자 정보 없이 남을 수 있습니다.</li>
+<li>접속 기록은 통신비밀보호법에 따라 3개월 동안 보관한 뒤 파기합니다.</li>
+</ul>`;
       }
     },
     location: {
@@ -111,7 +142,7 @@
     footer() {
       const o = op();
       const parts = [o.companyName && `상호 ${esc(o.companyName)}`, o.ceo && `대표 ${esc(o.ceo)}`, o.businessNumber && `사업자등록번호 ${esc(o.businessNumber)}`, o.mailOrderNumber && `통신판매업 ${esc(o.mailOrderNumber)}`, o.address && esc(o.address), o.email && `문의 <a href="mailto:${esc(o.email)}">${esc(o.email)}</a>`].filter(Boolean);
-      return `<nav class="legal-links"><a href="#/legal/terms">이용약관</a><a href="#/legal/privacy"><b>개인정보처리방침</b></a><a href="#/legal/location">위치기반서비스 이용약관</a></nav>${parts.length ? `<p>${parts.join(' · ')}</p>` : ''}`;
+      return `<nav class="legal-links"><a href="#/legal/terms">이용약관</a><a href="#/legal/privacy"><b>개인정보처리방침</b></a><a href="#/legal/location">위치기반서비스 이용약관</a><a href="#/legal/delete">계정 삭제 안내</a></nav>${parts.length ? `<p>${parts.join(' · ')}</p>` : ''}`;
     }
   };
 })();

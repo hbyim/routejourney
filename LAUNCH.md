@@ -10,7 +10,7 @@
 - [ ] (권장) 가입 봇 차단용 CAPTCHA (Supabase Auth의 Cloudflare Turnstile 연동)
 - [ ] 상용 지도 타일 키 발급 후 `config.js`의 `tileUrl` 교체 (MapTiler, Stadia Maps 등). OpenStreetMap 기본 타일은 상용 트래픽에 쓸 수 없습니다.
 - [ ] 사업자등록, `config.js`의 `operator` 정보(상호, 대표자, 사업자번호, 주소, 문의 메일, 개인정보 보호책임자) 입력
-- [ ] 위치기반서비스사업 신고 (방송통신위원회, "현재 위치" 기능 때문에 필요). 신고 전이라면 `현재 위치` 버튼을 숨기는 방법도 있습니다.
+- [ ] 위치기반서비스사업 신고 (방송통신위원회, "현재 위치" 기능 때문에 필요). `현재 위치` 버튼은 `js/config.js`의 `operator.locationBusinessNumber`에 신고번호를 넣으면 자동으로 나타나고, 그 전에는 숨겨져 있습니다(`currentLocation`으로 강제로 켜거나 끌 수 있음).
 - [ ] `js/legal.js` 약관·방침 초안 법률 검토 후 `legalEffectiveDate` 확정
 - [ ] 도메인 구입 후 GitHub Pages 커스텀 도메인 연결 (Settings > Pages), Supabase Redirect URL과 `index.html`의 og:url·og:image 주소를 새 도메인으로 교체, `404.html`의 경로 수정
 

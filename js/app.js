@@ -6,6 +6,8 @@
   // 안드로이드·iOS 앱(Capacitor) 안에서 실행 중인지
   const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform());
   const NativeShare = NATIVE && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+  // '현재 위치' 기능. 'auto'면 위치기반서비스사업 신고번호(operator.locationBusinessNumber)가 있을 때만 켠다.
+  const LOC_ON = CFG.currentLocation === true || (CFG.currentLocation !== false && !!(CFG.operator && CFG.operator.locationBusinessNumber));
   const DB_KEY = 'routelog.v1';
   const TOKYO = [35.6812, 139.7671];
   const CATS = {
@@ -951,7 +953,7 @@
         <label>지역·도시<input class="input" name="area" maxlength="40" placeholder="예: 도쿄 시부야" value="${sp ? esc(sp.area || '') : ''}"></label>
         <datalist id="spotNames">${Object.values(db.spots).map(s => `<option value="${esc(s.name)}">`).join('')}</datalist>
         ${pickMapHtml('postMap')}
-        <div class="row between"><span class="small muted" id="locLabel">검색하거나 지도를 눌러 위치를 정해주세요.</span><button type="button" class="btn sm ghost" data-act="geo">현재 위치</button></div>
+        <div class="row between"><span class="small muted" id="locLabel">검색하거나 지도를 눌러 위치를 정해주세요.</span>${LOC_ON ? '<button type="button" class="btn sm ghost" data-act="geo">현재 위치</button>' : ''}</div>
         <input type="hidden" name="lat"><input type="hidden" name="lng">
       </section>
       <section class="group">
@@ -1145,10 +1147,11 @@
     const u = me();
     return `<section class="card pad account"><h2>계정</h2>
       <p class="small muted">${esc(cloud.user && cloud.user.email || '')}</p>
-      <label class="switch"><input type="checkbox" data-act="toggle-location" ${u.locationAgreedAt ? 'checked' : ''}> 위치기반서비스 이용 동의 (현재 위치 버튼)</label>
+      ${LOC_ON ? `<label class="switch"><input type="checkbox" data-act="toggle-location" ${u.locationAgreedAt ? 'checked' : ''}> 위치기반서비스 이용 동의 (현재 위치 버튼)</label>` : ''}
       <label class="switch"><input type="checkbox" data-act="toggle-marketing" ${u.marketing ? 'checked' : ''}> 이벤트·소식 알림 받기</label>
       <div class="row"><button class="btn ghost" data-act="set-password">${cloud.hasPassword() ? '비밀번호 변경' : '비밀번호 설정'}</button></div>
       <div class="row"><button class="btn ghost" data-act="logout">로그아웃</button><button class="btn danger" data-act="delete-account">회원 탈퇴</button></div>
+      <p class="small muted"><a href="#/legal/delete">탈퇴하면 무엇이 지워지나요?</a></p>
     </section>`;
   }
 
@@ -1255,7 +1258,7 @@
         <label class="check-line"><input type="checkbox" name="age" required> [필수] 만 14세 이상이에요</label>
         <label class="check-line"><input type="checkbox" name="terms" required> [필수] <a href="#/legal/terms" target="_blank">이용약관</a> 동의</label>
         <label class="check-line"><input type="checkbox" name="privacy" required> [필수] <a href="#/legal/privacy" target="_blank">개인정보 수집·이용</a> 동의</label>
-        <label class="check-line"><input type="checkbox" name="location"> [선택] <a href="#/legal/location" target="_blank">위치기반서비스 이용약관</a> 동의 (현재 위치 버튼)</label>
+        ${LOC_ON ? '<label class="check-line"><input type="checkbox" name="location"> [선택] <a href="#/legal/location" target="_blank">위치기반서비스 이용약관</a> 동의 (현재 위치 버튼)</label>' : ''}
         <label class="check-line"><input type="checkbox" name="marketing"> [선택] 이벤트·소식 알림 받기</label>
         <button class="btn big block">시작하기</button>
       </form>
@@ -1662,6 +1665,7 @@
         break;
       }
       case 'geo':
+        if (!LOC_ON) break;
         if (cloud && me() && !me().locationAgreedAt) {
           if (!(await confirmModal('위치기반서비스 이용에 동의할까요?', '현재 위치는 포스팅의 장소 입력에만 쓰고 따로 저장하지 않아요. <a href="#/legal/location" target="_blank">약관 보기</a>', '동의하고 사용'))) break;
           me().locationAgreedAt = new Date().toISOString();
@@ -2027,6 +2031,31 @@
   });
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  // 안드로이드 뒤로가기 버튼: 열린 창 닫기 → 작성 중이면 취소 확인 → 이전 화면 → 홈에서는 두 번 눌러 종료
+  const NativeApp = NATIVE && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+  if (NativeApp) {
+    let exitArmedAt = 0;
+    NativeApp.addListener('backButton', ({ canGoBack }) => {
+      const m = $('#modal');
+      if (m && !m.hidden) {
+        // 확인 창은 '취소'를 누른 것처럼 닫아서 기다리던 쪽이 끝나게 한다
+        const back = m.querySelector('[data-confirm="0"]') || m.querySelector('.modal-back');
+        if (back) back.click(); else closeModal();
+        return;
+      }
+      const cancel = document.querySelector('#app [data-act="cancel-new"]');
+      if (cancel) { cancel.click(); return; }
+      const h = location.hash;
+      if (!h || h === '#' || h === '#/') {
+        if (Date.now() - exitArmedAt < 2000) { NativeApp.exitApp(); return; }
+        exitArmedAt = Date.now();
+        toast('한 번 더 누르면 앱이 종료돼요.');
+        return;
+      }
+      if (canGoBack) history.back(); else location.hash = '#/';
+    });
+  }
   window.addEventListener('hashchange', () => route());
   window.addEventListener('offline', () => toast('오프라인이에요. 연결되면 다시 저장할 수 있어요.'));
   let lastWide = matchMedia('(min-width: 1024px)').matches;

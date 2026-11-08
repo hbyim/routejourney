@@ -33,6 +33,10 @@ window.RL_CONFIG = {
   },
   legalEffectiveDate: '2026-11-01',
 
+  // '현재 위치' 버튼. 'auto'는 위의 위치기반서비스사업 신고번호를 채우면 자동으로 켜져요.
+  // true면 신고번호가 없어도 켜고, false면 항상 숨겨요.
+  currentLocation: 'auto',
+
   // 웹 주소. 안드로이드·iOS 앱 안에서는 페이지 주소가 기기 내부 주소라서, 공유 링크와 메일 링크에 이 주소를 쓴다.
   publicUrl: 'https://mytripatoz.com/'
 };
