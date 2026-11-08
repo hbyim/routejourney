@@ -659,7 +659,7 @@
     </div>
     <div class="guide-main sheet">
       <header class="guide-head">
-        <a class="back" href="#/" data-act="back">← 뒤로</a>
+        <div class="g-top"><a class="back" href="#/" data-act="back">← 뒤로</a><button class="btn sm ghost g-more" data-act="guide-menu" data-id="${esc(g.id)}" aria-label="가이드 메뉴">${dots}${mine ? '편집·삭제' : '더보기'}</button></div>
         <div class="g-badges">${parent || g.forkedFromTitle ? `<span class="badge">${forkIcon}포크한 가이드</span>` : ''}${forkCount(g) ? `<span class="badge">${forkIcon}${forkCount(g)}명이 포크</span>` : ''}${(g.tags || []).map(t => `<a class="tag" href="#/explore?q=${encodeURIComponent(t)}">#${esc(t)}</a>`).join('')}${mine && g.visibility !== 'public' ? `<span class="tag">${VIS[g.visibility]}</span>` : ''}</div>
         <h1>${esc(g.title)}</h1>
         <div class="g-meta"><a class="who" href="#/user/${esc(owner.id)}">${avatar(owner, 26)}<b>${esc(owner.name)}</b></a><span>${esc(g.city)} · ${dayList.length}일 · 스팟 ${total}곳 · 약 ${totalCost}</span></div>
@@ -707,7 +707,7 @@
                   <p class="stop-meta">${c.label}${p ? ` · ${fmtTime(p.at)}` : ''}${p && p.rating ? ` · <span class="st">★ ${p.rating}</span>` : ''}${p && WEATHER[p.weather] ? ` · ${wxIcon(p.weather, 16)}` : ''}</p>
                   ${p && p.text ? `<p class="stop-text clamp2">${esc(p.text)}</p>` : ''}
                   ${it.note ? `<p class="note">메모: ${esc(it.note)}</p>` : ''}
-                  ${p ? `<p class="stop-links">${by && by.id !== g.ownerId ? `<span>${esc(by.name)}님의 기록</span>` : ''}${cmtLink(p)}${p.userId === db.me ? `<a href="#/post/${esc(p.id)}/edit">수정</a>` : ''}</p>` : ''}
+                  ${p ? `<p class="stop-links">${by && by.id !== g.ownerId ? `<span>${esc(by.name)}님의 기록</span>` : ''}${cmtLink(p)}${p.userId === db.me ? `<a href="#/post/${esc(p.id)}/edit">수정</a><button type="button" class="linkish" data-act="delete-post" data-id="${esc(p.id)}">삭제</button>` : ''}</p>` : ''}
                 </div>
                 <div class="stop-end">${p ? `<span>${money(p.cost, p.currency)}</span>` : ''}
                   ${following ? `<label class="check"><input type="checkbox" data-act="done" data-g="${esc(g.id)}" data-i="${esc(it.id)}" ${done ? 'checked' : ''} aria-label="${esc(s.name)} 방문"> 방문</label>` : ''}</div>
@@ -1574,7 +1574,7 @@
         openModal(`<h2>${esc(g.title)}</h2><div class="menu-list">
           ${isMine(g) ? `<a class="btn ghost block" href="#/guide/${esc(id)}/edit">가이드 편집</a>${db.activeTripId === id ? '<button class="btn ghost block" data-act="end-trip">여행 마치기</button>' : `<button class="btn ghost block" data-act="resume-trip" data-id="${esc(id)}">이 여행 이어서 기록하기</button>`}` : `<button class="btn ghost block" data-act="follow" data-id="${esc(id)}">${following ? '따라가기 끄기' : '이 가이드 따라가기'}</button>`}
           <button class="btn ghost block" data-act="share" data-id="${esc(id)}">공유</button>
-          ${isMine(g) ? '' : `<button class="btn ghost block danger" data-act="report" data-type="guide" data-id="${esc(id)}">신고</button>`}
+          ${isMine(g) ? `<button class="btn ghost block danger" data-act="delete-guide" data-id="${esc(id)}">가이드 삭제</button>` : `<button class="btn ghost block danger" data-act="report" data-type="guide" data-id="${esc(id)}">신고</button>`}
           <button class="btn ghost block" data-close>닫기</button></div>`);
         break;
       }
