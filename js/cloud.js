@@ -65,11 +65,20 @@
     let chain = Promise.resolve();
     const q = fn => { const p = chain.then(fn); chain = p.catch(() => {}); return p; };
     const ok = ({ data, error }) => { if (error) throw error; return data; };
+    // posts 의 계산 열 listed(전체 공개 가이드에 들어간 포스팅인지). 아직 SQL을 적용하지 않은 DB면 빼고 읽는다.
+    let postCols = '*, listed', postColsChecked = false;
+    const checkPostCols = async () => {
+      if (postColsChecked) return;
+      postColsChecked = true;
+      const { error } = await sb.from('posts').select('id, listed').limit(1);
+      if (error && /listed/.test(error.message || '')) { postCols = '*'; console.warn('posts.listed 계산 열이 없어요. supabase/migrations/20261112_location_privacy.sql 을 적용하세요.'); }
+    };
+    const postsQ = () => sb.from('posts').select(postCols);
 
     /* ---------- 행 ↔ 앱 모델 ---------- */
     const toUser = r => ({ id: r.id, name: r.name, bio: r.bio || '', color: r.color, activeTripId: r.active_trip_id, termsAgreedAt: r.terms_agreed_at, locationAgreedAt: r.location_agreed_at, marketing: r.marketing_agreed });
     const toSpot = r => ({ id: r.id, name: r.name, cat: r.cat, lat: r.lat, lng: r.lng, area: r.area || '' });
-    const toPost = r => ({ id: r.id, userId: r.user_id, spotId: r.spot_id, at: r.at, text: r.text || '', rating: r.rating, cost: r.cost || 0, currency: r.currency || 'JPY', weather: r.weather || null, tags: r.tags || [], photo: r.photo_url, hidden: r.hidden });
+    const toPost = r => ({ id: r.id, userId: r.user_id, spotId: r.spot_id, at: r.at, text: r.text || '', rating: r.rating, cost: r.cost || 0, currency: r.currency || 'JPY', weather: r.weather || null, tags: r.tags || [], photo: r.photo_url, hidden: r.hidden, listed: r.listed });
     const toComment = r => ({ id: r.id, postId: r.post_id, userId: r.user_id, body: r.body, at: r.created_at, hidden: r.hidden });
     // 덧글 테이블을 아직 안 만들었으면(서버 SQL 미실행) 알아들을 수 있는 말로 바꾼다
     const noTable = err => {
@@ -115,6 +124,7 @@
       /* ---------- 읽기 ---------- */
       async loadAll(db) {
         const me = api.user && api.user.id;
+        await checkPostCols();
         const [likes, saves, follows, progress, blocks, myProfile] = me ? await Promise.all([
           sb.from('likes').select('guide_id').eq('user_id', me).then(ok),
           sb.from('saves').select('guide_id').eq('user_id', me).then(ok),
@@ -137,7 +147,7 @@
         const [recent, mine, extra, posts] = await Promise.all([
           recentGuides, mineGuides,
           savedIds.length ? sb.from('guides').select('*, guide_items(*)').in('id', savedIds.slice(0, CHUNK)).then(ok) : Promise.resolve([]),
-          sb.from('posts').select('*').order('at', { ascending: false }).limit(40).then(ok)
+          postsQ().order('at', { ascending: false }).limit(40).then(ok)
         ]);
         recent.concat(mine, extra).forEach(r => { db.guides[r.id] = toGuide(r, db.likes, db.saves); });
         posts.forEach(r => { db.posts[r.id] = toPost(r); });
@@ -147,7 +157,7 @@
       async fillRefs(db) {
         const guides = Object.values(db.guides);
         const postIds = uniq(guides.flatMap(g => g.items.map(i => i.postId))).filter(id => !db.posts[id]);
-        for (const ids of chunks(postIds)) (await sb.from('posts').select('*').in('id', ids).then(ok)).forEach(r => { db.posts[r.id] = toPost(r); });
+        for (const ids of chunks(postIds)) (await postsQ().in('id', ids).then(ok)).forEach(r => { db.posts[r.id] = toPost(r); });
         const parentIds = uniq(guides.map(g => g.forkedFrom)).filter(id => !db.guides[id]);
         for (const ids of chunks(parentIds)) (await sb.from('guides').select('*, guide_items(*)').in('id', ids).then(ok)).forEach(r => { db.guides[r.id] = toGuide(r, db.likes, db.saves); });
         const spotIds = uniq(Object.values(db.guides).flatMap(g => g.items.map(i => i.spotId)).concat(Object.values(db.posts).map(p => p.spotId))).filter(id => !db.spots[id]);
@@ -171,7 +181,7 @@
         const [prof, guides, posts] = await Promise.all([
           sb.from('profiles').select('id,name,bio,color').eq('id', id).maybeSingle().then(ok),
           sb.from('guides').select('*, guide_items(*)').eq('owner_id', id).limit(100).then(ok),
-          sb.from('posts').select('*').eq('user_id', id).order('at', { ascending: false }).limit(60).then(ok)
+          postsQ().eq('user_id', id).order('at', { ascending: false }).limit(60).then(ok)
         ]);
         if (!prof) return null;
         if (!db.users[id] || id !== db.me) db.users[id] = Object.assign(db.users[id] || {}, toUser(prof));
@@ -183,7 +193,7 @@
       async ensureSpot(db, id) {
         const [spot, posts, items] = await Promise.all([
           sb.from('spots').select('*').eq('id', id).maybeSingle().then(ok),
-          sb.from('posts').select('*').eq('spot_id', id).order('at', { ascending: false }).limit(60).then(ok),
+          postsQ().eq('spot_id', id).order('at', { ascending: false }).limit(60).then(ok),
           sb.from('guide_items').select('guide_id').eq('spot_id', id).limit(100).then(ok)
         ]);
         if (!spot) return null;
@@ -237,6 +247,8 @@
         return sb.from('guide_progress').upsert({ user_id: api.user.id, guide_id: gid, following: !!prog.__on, done, updated_at: new Date().toISOString() }, { onConflict: 'user_id,guide_id' }).then(ok);
       }),
       report: (type, id, reason) => q(() => sb.from('reports').upsert({ reporter_id: api.user.id, target_type: type, target_id: id, reason }, { onConflict: 'reporter_id,target_type,target_id', ignoreDuplicates: true }).then(ok)),
+      // 위치정보 이용사실 확인자료: '현재 위치'를 쓸 때마다 남긴다 (좌표는 저장하지 않음)
+      logLocationUse: purpose => sb.from('location_logs').insert({ purpose }).then(ok),
       addComment: c => q(() => sb.from('comments').insert({ id: c.id, post_id: c.postId, user_id: api.user.id, body: c.body }).then(ok).catch(noTable)),
       deleteComment: id => q(() => sb.from('comments').delete().eq('id', id).then(ok)),
       updateProfile: fields => q(() => sb.from('profiles').update(fields).eq('id', api.user.id).then(ok)),

@@ -271,6 +271,8 @@
   // 목록에 보여도 되는 가이드: 공개 + 차단하지 않은 작성자 + 숨김 아님 (내 것은 항상)
   const listable = g => isMine(g) || (g.visibility !== 'private' && g.visibility !== 'link' && !g.hidden && !db.blocks[g.ownerId]);
   const postVisible = p => p && (p.userId === db.me || (!p.hidden && !db.blocks[p.userId]));
+  // 피드·프로필·스팟 목록에는 전체 공개 가이드의 포스팅만 (링크 공유 가이드의 포스팅은 그 가이드 안에서만 보인다)
+  const postListed = p => postVisible(p) && (p.userId === db.me || p.listed !== false);
   const children = g => guidesArr().filter(x => x.forkedFrom === g.id && listable(x));
   function likeCount(g) { return (g.baseLikes || 0) + (db.likes[g.id] ? 1 : 0); }
   function saveCount(g) { return (g.baseSaves || 0) + (db.saves[g.id] ? 1 : 0); }
@@ -549,7 +551,7 @@
   /* ---------- 화면: 홈 피드 ---------- */
   function viewFeed() {
     const guides = guidesArr().filter(listable).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 24);
-    const posts = Object.values(db.posts).filter(postVisible).sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 12);
+    const posts = Object.values(db.posts).filter(postListed).sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 12);
     let introSeen = false;
     try { introSeen = !!localStorage.getItem('routelog.intro'); } catch (e) { /* noop */ }
     return `${todayCard()}
@@ -1115,7 +1117,7 @@
     const isMe = id === db.me;
     const blocked = !!db.blocks[id];
     const gs = guidesArr().filter(g => g.ownerId === id && (isMe || listable(g)));
-    const ps = Object.values(db.posts).filter(p => p.userId === id && (isMe || postVisible(p))).sort((a, b) => new Date(b.at) - new Date(a.at));
+    const ps = Object.values(db.posts).filter(p => p.userId === id && (isMe || postListed(p))).sort((a, b) => new Date(b.at) - new Date(a.at));
     const forksOfMine = gs.reduce((s, g) => s + forkCount(g), 0);
     const tab = profileTab[id] === 'posts' ? 'posts' : 'guides';
     const followers = u.followers != null ? u.followers : null;
@@ -1178,7 +1180,7 @@
   function viewSpot(id) {
     const s = db.spots[id];
     if (!s) return notFound();
-    const ps = Object.values(db.posts).filter(p => p.spotId === id && postVisible(p)).sort((a, b) => new Date(b.at) - new Date(a.at));
+    const ps = Object.values(db.posts).filter(p => p.spotId === id && postListed(p)).sort((a, b) => new Date(b.at) - new Date(a.at));
     const gs = guidesArr().filter(g => listable(g) && g.items.some(i => i.spotId === id));
     const rated = ps.filter(p => p.rating);
     const avg = rated.length ? (rated.reduce((a, p) => a + p.rating, 0) / rated.length).toFixed(1) : '-';
@@ -1674,6 +1676,7 @@
         if (!navigator.geolocation) { toast('이 브라우저는 위치를 지원하지 않아요.'); break; }
         navigator.geolocation.getCurrentPosition(pos => {
           const { latitude, longitude } = pos.coords;
+          if (cloud && db.me) cloud.logLocationUse('post_location').catch(err => console.warn('location log', err));
           if (postPicker) postPicker(latitude, longitude);
           const m = maps[maps.length - 1];
           if (m) m.setView([latitude, longitude], 16);
