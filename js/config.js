@@ -29,9 +29,13 @@ window.RL_CONFIG = {
     address: '서울특별시 광진구 아차산로70길 62, 303동 205호(광장동, 현대아파트)',
     email: 'support@mytripatoz.com', // 고객 문의 및 신고 접수
     privacyOfficer: '장연옥', // 개인정보 보호책임자 이름
+    locationOfficer: '',      // 위치정보관리책임자 이름 (비우면 개인정보 보호책임자)
     privacyEmail: ''
   },
   legalEffectiveDate: '2026-11-01',
+  // 문서별 시행일과 변경 이력 (없으면 legalEffectiveDate)
+  legalDates: { privacy: '2026-11-20', location: '2026-11-20' },
+  legalHistory: { privacy: '2026-11-01 최초 시행, 2026-11-20 개정(국외 이전·위탁 상세, 법정 보관 정보 추가)' },
 
   // '현재 위치' 버튼. 'auto'는 위의 위치기반서비스사업 신고번호를 채우면 자동으로 켜져요.
   // true면 신고번호가 없어도 켜고, false면 항상 숨겨요.

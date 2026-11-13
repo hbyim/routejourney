@@ -411,3 +411,21 @@ begin
 exception when others then
   raise notice 'pg_cron 예약 실패(수동으로 purge_location_logs()를 주기적으로 실행하세요): %', sqlerrm;
 end $$;
+
+
+create or replace function public.purge_my_location_logs() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.location_logs where user_id = old.id;
+  return null;
+end $$;
+revoke all on function public.purge_my_location_logs() from public, anon, authenticated;
+
+drop trigger if exists profiles_location_withdraw on public.profiles;
+create trigger profiles_location_withdraw after update of location_agreed_at on public.profiles
+  for each row when (old.location_agreed_at is not null and new.location_agreed_at is null)
+  execute function public.purge_my_location_logs();
+
+drop trigger if exists profiles_deleted_location_logs on public.profiles;
+create trigger profiles_deleted_location_logs after delete on public.profiles
+  for each row execute function public.purge_my_location_logs();
