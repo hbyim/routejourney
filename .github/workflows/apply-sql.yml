@@ -32,6 +32,7 @@ jobs:
           P="supabase/migrations/$FILE"
           [ -f "$P" ] || fail "$P 파일이 없어요"
           API="https://api.supabase.com/v1/projects/$REF/database/query"
+          echo "== project: $(curl -s "https://api.supabase.com/v1/projects/$REF" -H "Authorization: Bearer $SB_TOKEN" | jq -c '{name, region, status}')"
           run() { jq -n --arg q "$1" '{query: $q}' > /tmp/body; curl -s -o /tmp/res -w '%{http_code}' -X POST "$API" -H "Authorization: Bearer $SB_TOKEN" -H 'Content-Type: application/json' --data @/tmp/body; }
           if [ "$APPLY" = true ]; then SQL=$(cat "$P"); echo "== apply $P"; else SQL="begin;
           $(cat "$P")
